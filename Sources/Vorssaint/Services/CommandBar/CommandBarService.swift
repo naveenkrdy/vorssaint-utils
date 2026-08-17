@@ -959,10 +959,6 @@ final class CommandBarService: ObservableObject {
                 : bar.selectedTitle + " · " + selectionPreview
             rows.append(contentsOf: selectionEntries)
         }
-        if !finderSelectionEntries.isEmpty {
-            titles[rows.count] = bar.selectedTitle
-            rows.append(contentsOf: finderSelectionEntries)
-        }
 
         let offerable = (catalog + appEntries + macSettingsEntries + windowEntries).filter {
             !hidden.contains($0.stableKey) && allowed($0)
