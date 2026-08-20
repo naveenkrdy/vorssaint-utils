@@ -1409,7 +1409,7 @@ final class CommandBarService: ObservableObject {
                 self?.revealInFinder(entry)
             })
         }
-        if let process = killProcessEntry(for: entry) {
+        if let process = killProcessEntry(for: entry), !process.isProtected {
             let killStrings = FeatureStrings.killProcess(L10n.shared.language)
             actions.append(RowAction(id: "forceKillProcess",
                                      title: killStrings.forceKillButton,

@@ -126,7 +126,7 @@ enum SettingsDirectory {
                 SettingsDirectoryItem(page: .killProcess,
                                       title: FeatureStrings.killProcess(language).pageTitle,
                                       icon: "xmark.octagon",
-                                      keywords: ["force quit", "activity monitor", "task manager", "kill"]),
+                                      keywords: ["force quit", "process", "cpu", "memory", "kill"]),
             ]),
             (categories.utilities, [
                 SettingsDirectoryItem(page: .commandBar,

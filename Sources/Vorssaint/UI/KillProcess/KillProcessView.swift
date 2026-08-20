@@ -6,7 +6,7 @@ import SwiftUI
 
 /// Kill Process, embedded as a Settings page: a live, searchable list of
 /// every running process with kill, force-kill, kill-all, kill-tree, and
-/// restart actions - the native equivalent of Raycast's Kill Process command.
+/// restart actions.
 struct KillProcessView: View {
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var service = KillProcessService.shared
@@ -209,12 +209,16 @@ struct KillProcessView: View {
                 pendingAction = .kill(entry, force: false)
             }
             .frame(minWidth: 44)
+            .disabled(entry.isProtected)
             Menu {
                 Button(strings.forceKillButton) { pendingAction = .kill(entry, force: true) }
+                    .disabled(entry.isProtected)
                 Button(String(format: strings.killAllFormat, entry.name)) {
                     pendingAction = .killAll(name: entry.name, force: false)
                 }
+                .disabled(entry.isProtected)
                 Button(strings.killTreeButton) { pendingAction = .killTree(entry, force: false) }
+                    .disabled(entry.isProtected)
                 if service.canRestart(entry) {
                     Button(strings.restartButton) { service.restart(entry) }
                 }
@@ -279,9 +283,9 @@ struct KillProcessView: View {
     }
 
     /// Ticks only while this page is open AND its window is key, so the
-    /// CPU/memory columns read live like Activity Monitor without polling
-    /// `ps` in the background - neither while some other Settings page is
-    /// showing, nor while this one is open but not the focused window.
+    /// CPU/memory columns read live without polling `ps` in the background -
+    /// neither while some other Settings page is showing, nor while this one
+    /// is open but not the focused window.
     /// The interval matches the service's own freshness cache exactly, so
     /// every tick does real work instead of a third of them being no-ops.
     private func updateTimer(for state: ControlActiveState) {

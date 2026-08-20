@@ -7,8 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [3.3.3]
 
 ### Summary
-Vorssaint 3.3.3 adds full manual and temperature-based Fan Control and keeps the
+Vorssaint 3.3.3 adds full manual and temperature-based Fan Control, an opt-in Kill Process tool and keeps the
 grouped App Switcher clear when moving between windows.
+
+### Added
+- An opt-in Kill Process feature searches running processes to force quit, restart or terminate
+  process trees from Settings and the Command Bar. It ships uninstalled. Thanks to @naveenkrdy.
 
 ### Changed
 - Fan Control now offers System, continuous Manual control from 0% to 100% and

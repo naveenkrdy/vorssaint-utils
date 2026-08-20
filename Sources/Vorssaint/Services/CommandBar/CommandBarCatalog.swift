@@ -980,12 +980,11 @@ enum CommandBarCatalog {
     }
 
     /// One row per running process, so typing its name finds and can kill it
-    /// directly - the bar's answer to Raycast's Kill Process command. Force
-    /// Kill, Kill All and Kill Process Tree live in the row's Actions panel,
-    /// the same place Force Quit and Restart live for apps.
+    /// directly. Force Kill, Kill All and Kill Process Tree live in the row's
+    /// Actions panel, the same place Force Quit and Restart live for apps.
     static func killProcessEntries(_ processes: [KillProcessEntry],
                                    killStrings: KillProcessFeatureStrings) -> [CommandBarEntry] {
-        processes.map { process in
+        processes.filter { !$0.isProtected }.map { process in
             CommandBarEntry(
                 id: "kill.\(process.pid)",
                 title: process.name,

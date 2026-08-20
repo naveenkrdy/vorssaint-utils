@@ -9660,6 +9660,38 @@ struct MetricsTests {
                    "app update formats keep their placeholders (\(language.rawValue))")
             expect(!FeatureStrings.appUpdates(language).notificationBodyOne.contains("%"),
                    "the single-app note carries no placeholder (\(language.rawValue))")
+            let killProcessValues = Mirror(reflecting: FeatureStrings.killProcess(language)).children
+                .compactMap { $0.value as? String }
+            expect(killProcessValues.count == 30 && killProcessValues.allSatisfy { !$0.isEmpty },
+                   "every kill process string is set for \(language.rawValue)")
+            expect(killProcessValues.allSatisfy { !$0.contains("—") },
+                   "no em-dash in visible kill process strings (\(language.rawValue))")
+            expect(FeatureStrings.killProcess(language).pidLabelFormat.contains("%d")
+                    && FeatureStrings.killProcess(language).processCountFormat.contains("%d")
+                    && FeatureStrings.killProcess(language).killAllFormat.contains("%@")
+                    && FeatureStrings.killProcess(language).confirmKillFormat.contains("%@")
+                    && FeatureStrings.killProcess(language).confirmForceKillFormat.contains("%@")
+                    && FeatureStrings.killProcess(language).confirmKillAllFormat.contains("%@")
+                    && FeatureStrings.killProcess(language).confirmKillTreeFormat.contains("%@")
+                    && FeatureStrings.killProcess(language).adminPromptFormat.contains("%@"),
+                   "kill process formats keep their placeholders (\(language.rawValue))")
+        }
+
+        // MARK: Kill Process safety
+        expect(KillProcessSupport.isProtected(pid: 0, name: "kernel_task", path: "/System/Library/"),
+               "PID 0 is protected")
+        expect(KillProcessSupport.isProtected(pid: 1, name: "launchd", path: "/sbin/launchd"),
+               "PID 1 is protected")
+        expect(KillProcessSupport.isProtected(pid: 9999, name: "WindowServer", path: "/System/Library/Frameworks/WindowServer"),
+               "WindowServer is protected")
+        expect(KillProcessSupport.isProtected(pid: 9999, name: "loginwindow", path: "/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"),
+               "loginwindow is protected")
+        expect(KillProcessSupport.isProtected(pid: ProcessInfo.processInfo.processIdentifier, name: "Vorssaint"),
+               "current app PID is protected")
+        expect(!KillProcessSupport.isProtected(pid: 12345, name: "Safari", path: "/Applications/Safari.app/Contents/MacOS/Safari"),
+               "ordinary user app is not protected")
+
+        for language in AppLanguage.allCases {
             let categoryValues = Mirror(reflecting: FeatureStrings.settingsCategories(language)).children
                 .compactMap { $0.value as? String }
             expect(categoryValues.count == 6 && categoryValues.allSatisfy { !$0.isEmpty },

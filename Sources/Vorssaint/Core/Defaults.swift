@@ -868,6 +868,7 @@ enum Defaults {
         DefaultsKey.killProcessCommandBarEnabled: true,
         DefaultsKey.killProcessGroupRelated: true,
         DefaultsKey.killProcessSortBy: "cpu",
+        DefaultsKey.killProcessSortAscending: false,
         DefaultsKey.panelUtilityCleaner: true,
         DefaultsKey.panelUtilityHomebrew: true,
         DefaultsKey.panelUtilityAppUpdates: true,
