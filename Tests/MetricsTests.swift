@@ -1243,6 +1243,10 @@ struct MetricsTests {
                "Apple M5 uses the mapped CPU core sensor set")
         expect(TemperatureSensorSelector.platform(brandString: "Apple M10") == .generic,
                "future unmapped Apple Silicon generations keep the generic CPU sensor path")
+        expect(TemperatureSensorSelector.isCPUTemperatureKey("Tf4E", platform: .appleM3Family)
+                && !TemperatureSensorSelector.isCPUTemperatureKey("Tf4E", platform: .appleM4Family)
+                && TemperatureSensorSelector.isCPUTemperatureKey("Tp01", platform: .appleM4Family),
+               "M3 discovery includes its mapped Tf family without broadening later chips")
         let m1CPU = TemperatureSensorSelector.displayedCPUTemperature(
             readings: [("Tp09", 43.0), ("Tp01", 49.0), ("Tp02", 70.0)],
             platform: .appleM1Family
@@ -2115,7 +2119,8 @@ struct MetricsTests {
         expect(!SupportUpdateIntroInfo.shouldShow(appVersion: "3.3.2", lastSeenVersion: "3.3.2"),
                "support prompt stays hidden after it is seen")
         expect(!SupportUpdateIntroInfo.shouldShow(appVersion: "3.3.0", lastSeenVersion: nil)
-               && !SupportUpdateIntroInfo.shouldShow(appVersion: "3.3.1", lastSeenVersion: nil),
+               && !SupportUpdateIntroInfo.shouldShow(appVersion: "3.3.1", lastSeenVersion: nil)
+               && !SupportUpdateIntroInfo.shouldShow(appVersion: "3.3.3", lastSeenVersion: nil),
                "support prompt never leaks into another release")
         expect(SupportUpdateIntroStep.discord.next == .social
                && SupportUpdateIntroStep.social.next == .support
@@ -2139,13 +2144,13 @@ struct MetricsTests {
         // decision above is made consciously, never by omission.
         let releasePlist = NSDictionary(contentsOfFile: "Resources/Info.plist")
         let plistVersion = (releasePlist?["CFBundleShortVersionString"] as? String) ?? ""
-        expect(plistVersion == "3.3.2",
+        expect(plistVersion == "3.3.3",
                "bumping the app version requires re-deciding the support prompt pin above")
         let plistBuild = (releasePlist?["CFBundleVersion"] as? String) ?? ""
-        expect(plistBuild == "78",
+        expect(plistBuild == "79",
                "every app version needs its own incremented bundle build")
         expect(SupportUpdateIntroInfo.releaseVersion == "3.3.2",
-               "3.3.2 shows the deliberately curated community and support intro")
+               "the support prompt remains deliberately pinned to 3.3.2")
         // 3.3.2 adds several headline features, so the tour is re-curated
         // around only what this update genuinely introduces.
         expect(UpdateHighlightsInfo.releaseVersion == "3.3.2",
@@ -6529,9 +6534,11 @@ struct MetricsTests {
                + SwitcherIconRowLayout.padding * 2,
                "App Switcher simple mode replaces previews with a compact title rail")
         expect(iconRowLayout.simplePanelSize.width
-               == max(iconRowLayout.appRowSurfaceWidth, SwitcherIconRowLayout.hintBarWidth)
+               == max(iconRowLayout.appRowSurfaceWidth,
+                      iconRowLayout.simpleTitleSurfaceWidth,
+                      SwitcherIconRowLayout.hintBarWidth)
                + SwitcherIconRowLayout.padding * 2,
-               "App Switcher simple mode fits the app row and shortcut hints")
+               "App Switcher simple mode fits its app row, title rail and shortcut hints")
         let compactIconRowLayout = SwitcherIconRowLayout.compute(
             appCount: 1,
             selectedWindowCount: 1,
@@ -6544,8 +6551,10 @@ struct MetricsTests {
                - SwitcherIconRowLayout.hintHeight,
                "App Switcher removes the shortcut hint bar and its vertical space")
         expect(compactIconRowLayout.simplePanelSize.width
-               == compactIconRowLayout.appRowSurfaceWidth + SwitcherIconRowLayout.padding * 2,
-               "App Switcher without shortcut hints sizes the simple panel to its icon row")
+               == max(compactIconRowLayout.appRowSurfaceWidth,
+                      compactIconRowLayout.simpleTitleSurfaceWidth)
+                    + SwitcherIconRowLayout.padding * 2,
+               "App Switcher without shortcut hints still fits its title rail")
         expect(SwitcherSupport.gridSelectionIndex(after: 1,
                                                    itemCount: 8,
                                                    columns: 5,
@@ -7367,6 +7376,20 @@ struct MetricsTests {
                     Double(SwitcherIconRowLayout.simpleTitleHeight
                            + SwitcherIconRowLayout.simpleTitleGap),
                     "App Switcher simple window row removes the redundant grouped title strip")
+        let groupedWindowShortcutLayout = SwitcherIconRowLayout.compute(
+            appCount: 1,
+            selectedWindowCount: 2,
+            screenVisibleFrame: screen,
+            showsShortcutHints: false
+        )
+        expect(groupedWindowShortcutLayout.simpleTitleSurfaceWidth
+               >= SwitcherIconRowLayout.simpleTitleChipMaxWidth * 2
+                    + SwitcherIconRowLayout.simpleTitleSpacing,
+               "App Switcher grouped window shortcut leaves both window titles visible")
+        expectClose(Double(groupedWindowShortcutLayout.simplePanelSize.width),
+                    Double(groupedWindowShortcutLayout.simpleTitleSurfaceWidth
+                           + SwitcherIconRowLayout.padding * 2),
+                    "App Switcher grouped simple panel follows its window title width")
         let issue128Layout = SwitcherIconRowLayout.compute(appCount: 7,
                                                            selectedWindowCount: 2,
                                                            screenVisibleFrame: screen)
@@ -9085,7 +9108,7 @@ struct MetricsTests {
 
         expect(FanControlPolicy.coolingDuration == 15 * 60
                 && FanControlPolicy.heartbeatLimit < 10,
-               "maximum cooling is time-bounded and loses control quickly with its client")
+               "the legacy session stays bounded while current control loses ownership quickly")
         expect(FanControlPolicy.isAutomaticMode(0)
                 && FanControlPolicy.isAutomaticMode(3)
                 && !FanControlPolicy.isAutomaticMode(1)
@@ -9109,6 +9132,88 @@ struct MetricsTests {
                 && !FanControlPolicy.validReading(-1)
                 && !FanControlPolicy.validReading(.infinity),
                "fan readings stay within a safe display and verification range")
+        expect(FanControlPolicy.minimumCoolingLevel == 0
+                && FanControlPolicy.maximumCoolingLevel == 100
+                && FanControlPolicy.defaultCoolingLevel == 100
+                && FanControlPolicy.validCoolingLevel(0)
+                && FanControlPolicy.validCoolingLevel(55)
+                && FanControlPolicy.validCoolingLevel(100)
+                && !FanControlPolicy.validCoolingLevel(-5)
+                && !FanControlPolicy.validCoolingLevel(26),
+               "manual cooling accepts the full bounded five-percent scale")
+        expect(FanControlPolicy.coolingTargetRPM(minimum: 1_200, maximum: 5_800,
+                                                 level: 0) == 1_200
+                && FanControlPolicy.coolingTargetRPM(minimum: 1_200, maximum: 5_800,
+                                                     level: 25) == 2_350
+                && FanControlPolicy.coolingTargetRPM(minimum: 1_200, maximum: 5_800,
+                                                     level: 100) == 5_800
+                && FanControlPolicy.coolingTargetRPM(minimum: 5_800, maximum: 5_800,
+                                                     level: 100) == nil,
+               "manual targets map the full percentage scale into reported hardware bounds")
+
+        let defaultCurve = FanControlConfiguration.defaultCurve
+        expect(FanControlPolicy.validConfiguration(.manual(level: 0))
+                && FanControlPolicy.validConfiguration(.manual(level: 100))
+                && FanControlPolicy.validConfiguration(.curve([defaultCurve]))
+                && FanControlPolicy.interpolatedCoolingLevel(points: defaultCurve.points,
+                                                             temperature: 40) == 0
+                && FanControlPolicy.interpolatedCoolingLevel(points: defaultCurve.points,
+                                                             temperature: 60) == 50
+                && FanControlPolicy.interpolatedCoolingLevel(points: defaultCurve.points,
+                                                             temperature: 61) == 55
+                && FanControlPolicy.interpolatedCoolingLevel(points: defaultCurve.points,
+                                                             temperature: 80) == 100,
+               "the default curve starts at 50 degrees, reaches maximum at 70 and rounds safely up")
+        let coolingTemperature = [
+            FanControlTemperatureReading(source: .hottestSoC, celsius: 59),
+        ]
+        expect(FanControlPolicy.curveCoolingLevel(curves: [defaultCurve],
+                                                  temperatures: coolingTemperature,
+                                                  previousLevel: 50) == 50
+                && FanControlPolicy.curveCoolingLevel(
+                    curves: [defaultCurve],
+                    temperatures: [.init(source: .hottestSoC, celsius: 57)],
+                    previousLevel: 50
+                ) == 45,
+               "a cooling curve uses two-degree hysteresis before lowering fan speed")
+        let cpuCurve = FanControlCurve(
+            sensor: .averageCPU,
+            points: [FanControlCurvePoint(temperature: 40, coolingLevel: 0),
+                     FanControlCurvePoint(temperature: 80, coolingLevel: 80)]
+        )
+        let curveTemperatures = [
+            FanControlTemperatureReading(source: .hottestSoC, celsius: 54),
+            FanControlTemperatureReading(source: .averageCPU, celsius: 70),
+        ]
+        expect(FanControlPolicy.curveCoolingLevel(curves: [defaultCurve, cpuCurve],
+                                                  temperatures: curveTemperatures) == 60
+                && FanControlPolicy.curveCoolingLevel(curves: [defaultCurve, cpuCurve],
+                                                      temperatures: [curveTemperatures[0]]) == nil,
+               "several temperature rules use their highest demand and require every selected sensor")
+        let duplicateCurves = [defaultCurve,
+                               FanControlCurve(sensor: .hottestSoC, points: cpuCurve.points)]
+        let descendingCurve = FanControlCurve(
+            sensor: .averageCPU,
+            points: [FanControlCurvePoint(temperature: 50, coolingLevel: 80),
+                     FanControlCurvePoint(temperature: 70, coolingLevel: 40)]
+        )
+        expect(!FanControlPolicy.validCurves(duplicateCurves)
+                && !FanControlPolicy.validCurves([descendingCurve])
+                && FanControlConfiguration.decodeCurves(
+                    FanControlConfiguration.encodeCurves([defaultCurve]) ?? "") == [defaultCurve]
+                && FanControlConfiguration.decodeCurves("not json") == nil,
+               "stored curves reject duplicate sensors, unsafe slopes and malformed data")
+        let m3FanTemperatures = FanControlPolicy.aggregatedTemperatures(
+            cpuReadings: [("Te05", 44), ("Tf4E", 53), ("Tf4F", 76)],
+            gpuReadings: [48],
+            platform: .appleM3Family
+        )
+        expectClose(m3FanTemperatures.first { $0.source == .hottestCPU }?.celsius ?? -1,
+                    53,
+                    "M3 fan curves include the hottest mapped Tf CPU core")
+        expectClose(m3FanTemperatures.first { $0.source == .averageCPU }?.celsius ?? -1,
+                    48.5,
+                    "M3 fan curves exclude auxiliary Tf readings from the CPU average")
         expect(FanControlPolicy.telemetryReadings(expectedCount: 1, readings: [1_200]) == [1_200]
                 && FanControlPolicy.telemetryReadings(expectedCount: 2,
                                                       readings: [1_200, 1_350]) == [1_200, 1_350],
@@ -9150,7 +9255,13 @@ struct MetricsTests {
                                               heartbeatAge: 0,
                                               verificationFailures: 0,
                                               thermalState: .nominal) == .timeLimit,
-               "the watchdog restores automatic control at the fixed deadline")
+               "the watchdog still honors a deadline from a legacy helper request")
+        expect(FanControlPolicy.restoreReason(now: watchdogEnd,
+                                              endsAt: nil,
+                                              heartbeatAge: 0,
+                                              verificationFailures: 0,
+                                              thermalState: .nominal) == nil,
+               "current manual and curve control have no arbitrary time limit")
         expect(FanControlPolicy.restoreReason(now: Date(timeIntervalSince1970: 1_900),
                                               endsAt: watchdogEnd,
                                               heartbeatAge: FanControlPolicy.heartbeatLimit + 0.1,
@@ -9167,8 +9278,21 @@ struct MetricsTests {
                                               endsAt: watchdogEnd,
                                               heartbeatAge: 0,
                                               verificationFailures: 0,
+                                              temperatureFailures: FanControlPolicy.temperatureFailureLimit,
+                                              thermalState: .nominal) == .temperatureUnavailable,
+               "a curve returns control after repeated missing temperature readings")
+        expect(FanControlPolicy.restoreReason(now: Date(timeIntervalSince1970: 1_900),
+                                              endsAt: watchdogEnd,
+                                              heartbeatAge: 0,
+                                              verificationFailures: 0,
                                               thermalState: .serious) == .thermalPressure,
                "the watchdog returns control to the system under thermal pressure")
+        expect(FanControlPolicy.restoreReason(now: Date(timeIntervalSince1970: 1_900),
+                                              endsAt: watchdogEnd,
+                                              heartbeatAge: 0,
+                                              verificationFailures: 0,
+                                              thermalState: .fair) == nil,
+               "a fair thermal state does not cancel the user's selected control")
         expect(FanControlPolicy.restoreReason(now: Date(timeIntervalSince1970: 1_900),
                                               endsAt: watchdogEnd,
                                               heartbeatAge: 0,
@@ -9179,7 +9303,7 @@ struct MetricsTests {
         for language in AppLanguage.allCases {
             let strings = FeatureStrings.fanControl(language)
             let values = Mirror(reflecting: strings).children.compactMap { $0.value as? String }
-            expect(values.count == 21 && values.allSatisfy { !$0.isEmpty },
+            expect(values.count == 41 && values.allSatisfy { !$0.isEmpty },
                    "fan control has every localized field for \(language.rawValue)")
             expect(values.allSatisfy { !$0.contains("—") },
                    "fan control text uses human punctuation for \(language.rawValue)")
@@ -9187,7 +9311,24 @@ struct MetricsTests {
                          "fan name format stays valid for \(language.rawValue)")
             expectFormat(strings.rpmFormat, ["d"],
                          "fan speed format stays valid for \(language.rawValue)")
+            expectFormat(strings.currentRPMFormat, ["d"],
+                         "current fan speed format stays valid for \(language.rawValue)")
+            expectFormat(strings.targetRPMFormat, ["d"],
+                         "target fan speed format stays valid for \(language.rawValue)")
         }
+        expect(FanControlFeatureStrings.ru.rpmFormat == "%d об/мин"
+                && FanControlFeatureStrings.de.rpmFormat == "%d U/min"
+                && FanControlFeatureStrings.fr.rpmFormat == "%d tr/min",
+               "existing localized RPM units stay intact")
+
+        let legacyFanSnapshot = Data(#"{"fans":[],"isCooling":false}"#.utf8)
+        let decodedLegacyFanSnapshot = try? JSONDecoder().decode(FanControlSnapshot.self,
+                                                                  from: legacyFanSnapshot)
+        expect(decodedLegacyFanSnapshot != nil
+                && decodedLegacyFanSnapshot?.coolingLevel == nil
+                && decodedLegacyFanSnapshot?.configuration == nil
+                && decodedLegacyFanSnapshot?.temperatures == nil,
+               "fan snapshots remain compatible with an older installed helper")
 
         let fanMigrationSuite = "com.vorssaint.tests.fan-migration.\(UUID().uuidString)"
         if let fanMigration = UserDefaults(suiteName: fanMigrationSuite) {
@@ -12577,10 +12718,13 @@ struct MetricsTests {
                 && backupKeys.contains(DefaultsKey.panelToggleMicMute),
                "the quick toggles layout travels with the settings backup")
         expect(backupKeys.contains(DefaultsKey.panelShowFanControl)
+                && backupKeys.contains(DefaultsKey.fanControlMode)
+                && backupKeys.contains(DefaultsKey.fanControlCoolingLevel)
+                && backupKeys.contains(DefaultsKey.fanControlCurves)
                 && backupKeys.contains(DefaultsKey.menuBarFanSpeed)
                 && !backupKeys.contains(DefaultsKey.fanControlRecoveryNeeded)
                 && !backupKeys.contains(DefaultsKey.fanControlHelperVersion),
-               "fan display preferences travel while helper recovery state stays on one Mac")
+               "fan display and cooling preferences travel while helper recovery state stays on one Mac")
         expect(backupKeys.contains(DefaultsKey.screenshotSharingEnabled),
                "the temporary screenshot links preference travels with settings backup")
         expect(!backupKeys.contains(DefaultsKey.clipboardHistoryEntries)

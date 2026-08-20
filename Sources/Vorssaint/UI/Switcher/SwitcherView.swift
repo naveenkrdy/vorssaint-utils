@@ -394,7 +394,7 @@ struct SwitcherView: View {
 
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: SwitcherIconRowLayout.simpleTitleSpacing) {
                             ForEach(appWindows, id: \.element.id) { entry in
                                 SwitcherWindowTitleChip(
                                     window: entry.element,
@@ -410,7 +410,7 @@ struct SwitcherView: View {
                                 .id(entry.element.id)
                             }
                         }
-                        .padding(.horizontal, 1)
+                        .padding(.horizontal, SwitcherIconRowLayout.simpleTitleScrollPadding)
                     }
                     .onChange(of: switcher.selectedIndex) { _, newIndex in
                         guard switcher.windows.indices.contains(newIndex) else { return }
@@ -421,7 +421,7 @@ struct SwitcherView: View {
                 }
                 .frame(height: 25 * SwitcherIconRowLayout.scale)
             }
-            .padding(10 * SwitcherIconRowLayout.scale)
+            .padding(SwitcherIconRowLayout.simpleTitlePanelPadding)
             .frame(width: iconRowContentWidth,
                    height: SwitcherIconRowLayout.simpleTitleHeight,
                    alignment: .leading)
@@ -551,7 +551,8 @@ struct SwitcherView: View {
     private var iconRowContentWidth: CGFloat {
         if simpleMode {
             return max(switcher.iconRowLayout.appRowSurfaceWidth,
-                       SwitcherIconRowLayout.hintBarWidth)
+                       usesWindowRow ? 0 : switcher.iconRowLayout.simpleTitleSurfaceWidth,
+                       showsShortcutHints ? SwitcherIconRowLayout.hintBarWidth : 0)
         }
         return max(switcher.iconRowLayout.appRowSurfaceWidth,
                    switcher.iconRowLayout.previewSurfaceWidth,
