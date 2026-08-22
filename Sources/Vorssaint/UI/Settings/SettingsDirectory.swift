@@ -125,6 +125,10 @@ enum SettingsDirectory {
                 SettingsDirectoryItem(page: .uninstaller, title: s.uninstallerName, icon: "trash"),
                 SettingsDirectoryItem(page: .quarantineManager, title: s.quarantineManagerName,
                                       icon: "shield.lefthalf.filled"),
+                SettingsDirectoryItem(page: .killProcess,
+                                      title: FeatureStrings.killProcess(language).pageTitle,
+                                      icon: "xmark.octagon",
+                                      keywords: ["force quit", "process", "cpu", "memory", "kill"]),
             ]),
             (categories.utilities, [
                 SettingsDirectoryItem(page: .commandBar,

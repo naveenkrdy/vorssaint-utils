@@ -135,6 +135,10 @@ final class CommandBarService: ObservableObject {
     /// quarantine). Read once per opening, same lifetime as `selectionEntries`.
     private var finderSelectionEntries: [CommandBarEntry] = []
     private var finderSelectionLoading = false
+    /// One row per running process. Read once per opening through
+    /// `KillProcessService`'s own cache, same lifetime as `selectionEntries`.
+    private var killProcessEntries: [CommandBarEntry] = []
+    private var killProcessEntriesLoading = false
     /// True while the bar is closing, so nothing is rebuilt on the way out.
     private var isTearingDown = false
     private var menusLoading = false
@@ -299,6 +303,7 @@ final class CommandBarService: ObservableObject {
         selectionPreview = ""
         selectedText = ""
         finderSelectionEntries = []
+        killProcessEntries = []
         rebuildCatalog(index: false)
         rebuildRunningEntries()
         startBackgroundLoads(for: presentationID)
@@ -314,6 +319,7 @@ final class CommandBarService: ObservableObject {
         loadMenusIfNeeded(for: id)
         loadSelection(for: id)
         loadFinderSelection(for: id)
+        loadKillProcessEntries(for: id)
     }
 
     private func present(_ panel: NSPanel) {
@@ -355,6 +361,10 @@ final class CommandBarService: ObservableObject {
         }
         if !finderSelectionEntries.isEmpty {
             finderSelectionEntries = []
+            indexEntries()
+        }
+        if !killProcessEntries.isEmpty {
+            killProcessEntries = []
             indexEntries()
         }
         // What was typed is remembered for the next opening, where the first
@@ -574,6 +584,8 @@ final class CommandBarService: ObservableObject {
                 CommandBarPreferences.source(ofRowID: $0.id) == source
                     && !hidden.contains($0.stableKey)
             }
+        case .killProcess:
+            return AppFeature.killProcess.isAvailable
         case .quitApps, .answers, .calculator, .selection, .files:
             return false
         }
@@ -600,6 +612,7 @@ final class CommandBarService: ObservableObject {
             rows = CommandBarCatalog.clipboardBrowseEntries(limit: limit, bar: bar) { [weak self] entry in
                 self?.paste(entry)
             }
+        case .killProcess: rows = killProcessEntries
         case .quitApps, .answers, .calculator, .selection, .files:
             rows = []
         }
@@ -635,6 +648,7 @@ final class CommandBarService: ObservableObject {
         case .selection: return bar.sourceSelection
         case .files: return bar.sourceFiles
         case .links: return bar.linksTitle
+        case .killProcess: return FeatureStrings.killProcess(L10n.shared.language).pageTitle
         }
     }
 
@@ -793,8 +807,8 @@ final class CommandBarService: ObservableObject {
     /// Every row the bar can rank right now, in the order the pool builds
     /// them: what the Mac holds first, what is borrowed after.
     private var indexableEntries: [CommandBarEntry] {
-        selectionEntries + finderSelectionEntries + catalog + appEntries + macSettingsEntries
-            + windowEntries + quitEntries + menuEntries + emojiEntries
+        selectionEntries + finderSelectionEntries + killProcessEntries + catalog + appEntries
+            + macSettingsEntries + windowEntries + quitEntries + menuEntries + emojiEntries
     }
 
     private func indexEntries() {
@@ -1041,7 +1055,7 @@ final class CommandBarService: ObservableObject {
         case .snippets: return bar.kindSnippet
         case .folders: return bar.kindFolder
         case .actions, .apps, .menus, .windows, .quitApps, .settingsPages, .macSettings,
-             .clipboard, .emoji, .calculator, .selection, .files:
+             .clipboard, .emoji, .calculator, .selection, .files, .killProcess:
             return entry.subtitle.isEmpty ? bar.everythingTitle : entry.subtitle
         }
     }
@@ -1206,8 +1220,10 @@ final class CommandBarService: ObservableObject {
         if CommandBarSearch.matchesVerb(trimmed, in: bar.quitFormat) {
             pool.append(contentsOf: quitEntries)
         }
-        // Menu commands are a deep list; below two letters they would bury
-        // everything the bar itself can do.
+        // Menu commands are a deep list; below two letters it would bury
+        // everything the bar itself can do. Running processes are excluded
+        // from ordinary typed search entirely - they only surface once you've
+        // explicitly entered the Kill Process category (see categoryContent).
         if effectiveQuery.count >= 2 {
             pool.append(contentsOf: menuEntries)
             pool.append(contentsOf: emojiEntries)
@@ -1404,6 +1420,35 @@ final class CommandBarService: ObservableObject {
                 self?.revealInFinder(entry)
             })
         }
+        if let process = killProcessEntry(for: entry), !process.isProtected {
+            let killStrings = FeatureStrings.killProcess(L10n.shared.language)
+            actions.append(RowAction(id: "forceKillProcess",
+                                     title: killStrings.forceKillButton,
+                                     symbolName: "exclamationmark.octagon",
+                                     isDestructive: true) { [weak self] in
+                self?.confirmForceKillProcess(process)
+            })
+            actions.append(RowAction(id: "killAllProcess",
+                                     title: String(format: killStrings.killAllFormat, process.name),
+                                     symbolName: "xmark.octagon",
+                                     isDestructive: true) { [weak self] in
+                self?.confirmKillAllProcesses(process)
+            })
+            actions.append(RowAction(id: "killProcessTree",
+                                     title: killStrings.killTreeButton,
+                                     symbolName: "xmark.octagon",
+                                     isDestructive: true) { [weak self] in
+                self?.confirmKillProcessTree(process)
+            })
+            if KillProcessService.shared.canRestart(process) {
+                actions.append(RowAction(id: "restartProcess",
+                                         title: killStrings.restartButton,
+                                         symbolName: "arrow.clockwise") { [weak self] in
+                    self?.hide()
+                    KillProcessService.shared.restart(process)
+                })
+            }
+        }
         if CommandBarPreferences.acceptsPin(rowID: entry.id) {
             actions.append(RowAction(id: "pin",
                                      title: isPinned(entry) ? bar.actionUnpin : bar.actionPin,
@@ -1471,6 +1516,11 @@ final class CommandBarService: ObservableObject {
     private func installedApp(for entry: CommandBarEntry) -> InstalledApps.InstalledApp? {
         guard entry.id.hasPrefix("app.") else { return nil }
         return cachedApps.first { "app.\($0.id)" == entry.id }
+    }
+
+    private func killProcessEntry(for entry: CommandBarEntry) -> KillProcessEntry? {
+        guard entry.id.hasPrefix("kill."), let pid = pid_t(entry.id.dropFirst("kill.".count)) else { return nil }
+        return KillProcessService.shared.entries.first { $0.pid == pid }
     }
 
     private func runningApplication(for app: InstalledApps.InstalledApp) -> NSRunningApplication? {
@@ -1575,6 +1625,47 @@ final class CommandBarService: ObservableObject {
             NSSound.beep()
             return
         }
+    }
+
+    private func confirmForceKillProcess(_ process: KillProcessEntry) {
+        hide()
+        let killStrings = FeatureStrings.killProcess(L10n.shared.language)
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = String(format: killStrings.confirmForceKillFormat, process.name)
+        alert.informativeText = process.path
+        alert.addButton(withTitle: killStrings.forceKillButton)
+        alert.addButton(withTitle: L10n.shared.s.uninstallerCancel)
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        KillProcessService.shared.kill(process, force: true)
+    }
+
+    private func confirmKillAllProcesses(_ process: KillProcessEntry) {
+        hide()
+        let killStrings = FeatureStrings.killProcess(L10n.shared.language)
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = String(format: killStrings.confirmKillAllFormat, process.name)
+        alert.addButton(withTitle: killStrings.killButton)
+        alert.addButton(withTitle: L10n.shared.s.uninstallerCancel)
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        KillProcessService.shared.killAll(named: process.name, force: false)
+    }
+
+    private func confirmKillProcessTree(_ process: KillProcessEntry) {
+        hide()
+        let killStrings = FeatureStrings.killProcess(L10n.shared.language)
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = String(format: killStrings.confirmKillTreeFormat, process.name)
+        alert.informativeText = process.path
+        alert.addButton(withTitle: killStrings.killTreeButton)
+        alert.addButton(withTitle: L10n.shared.s.uninstallerCancel)
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        KillProcessService.shared.killTree(process, force: false)
     }
 
     private func openUninstaller(for url: URL) {
@@ -2063,6 +2154,34 @@ final class CommandBarService: ObservableObject {
                 self.indexEntries()
                 self.refreshResults()
             }
+        }
+    }
+
+    /// Every running process, so a name typed directly finds and can kill it.
+    /// Reads through `KillProcessService`'s own cache - shared with the
+    /// Settings page, so this never shells out to `ps` twice - and only
+    /// while the bar is open, same lifetime and guard shape as
+    /// `loadSelection(for:)`.
+    private func loadKillProcessEntries(for id: UUID) {
+        guard AppFeature.killProcess.isAvailable,
+              UserDefaults.standard.bool(forKey: DefaultsKey.killProcessCommandBarEnabled) else { return }
+        guard !killProcessEntriesLoading else { return }
+        killProcessEntriesLoading = true
+        KillProcessService.shared.refresh { [weak self] in
+            guard let self else { return }
+            self.killProcessEntriesLoading = false
+            guard self.presentationLifecycle.acceptsHomeUpdates(id, isVisible: self.isVisible) else {
+                let current = self.presentationID
+                if self.presentationLifecycle.acceptsHomeUpdates(current, isVisible: self.isVisible) {
+                    self.loadKillProcessEntries(for: current)
+                }
+                return
+            }
+            let killStrings = FeatureStrings.killProcess(L10n.shared.language)
+            self.killProcessEntries = CommandBarCatalog.killProcessEntries(
+                KillProcessService.shared.entries, killStrings: killStrings)
+            self.indexEntries()
+            self.refreshResults()
         }
     }
 
