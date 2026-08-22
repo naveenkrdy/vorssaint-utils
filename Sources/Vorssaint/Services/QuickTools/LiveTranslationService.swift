@@ -224,11 +224,15 @@ final class LiveTranslationService: ObservableObject {
         Task.detached(priority: .utility) {
             guard let probe = Self.warmUpProbeImage() else { return }
             let start = Date()
+#if compiler(>=6.2)
             if #available(macOS 26.0, *) {
                 _ = try? await RecognizeDocumentsRequest().perform(on: probe, orientation: nil)
             } else {
                 _ = Self.recognizeLines(in: probe, fallbackLanguages: ["en-US"])
             }
+#else
+            _ = Self.recognizeLines(in: probe, fallbackLanguages: ["en-US"])
+#endif
             liveTranslationDiagLog.notice("prewarm finished in \(Date().timeIntervalSince(start), privacy: .public)s")
         }
     }
@@ -411,6 +415,7 @@ final class LiveTranslationService: ObservableObject {
                 // An occasional cheap re-warm during the idle stretch avoids
                 // paying that spike on the content change that actually
                 // matters.
+#if compiler(>=6.2)
                 if #available(macOS 26.0, *),
                    defaults.string(forKey: DefaultsKey.liveTranslationEngine) != "compatibility",
                    !isReWarming,
@@ -423,6 +428,7 @@ final class LiveTranslationService: ObservableObject {
                         self?.isReWarming = false
                     }
                 }
+#endif
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                 continue
             }
@@ -454,6 +460,7 @@ final class LiveTranslationService: ObservableObject {
             // stored.
             let usesNativeEngine = defaults.string(forKey: DefaultsKey.liveTranslationEngine) != "compatibility"
             let groups: [[LiveTranslationSupport.RecognizedLine]]
+#if compiler(>=6.2)
             if #available(macOS 26.0, *), usesNativeEngine {
                 groups = await withDeadline(seconds: 4) {
                     await Self.recognizeDocumentGroups(in: image, fallbackLanguages: fallbackLanguages)
@@ -464,6 +471,14 @@ final class LiveTranslationService: ObservableObject {
                 } ?? []
                 groups = LiveTranslationSupport.groupIntoParagraphs(recognized)
             }
+#else
+            do {
+                let recognized = await withDeadline(seconds: 4) {
+                    Self.recognizeLines(in: image, fallbackLanguages: fallbackLanguages)
+                } ?? []
+                groups = LiveTranslationSupport.groupIntoParagraphs(recognized)
+            }
+#endif
             guard self.generation == generation else { return }
             let recognizeElapsed = Date().timeIntervalSince(recognizeStart)
             liveTranslationDiagLog.notice("recognized \(groups.count, privacy: .public) groups (image \(image.width, privacy: .public)x\(image.height, privacy: .public)) - capture=\(captureElapsed, privacy: .public)s blur=\(blurElapsed, privacy: .public)s recognize=\(recognizeElapsed, privacy: .public)s tickTotal=\(Date().timeIntervalSince(tickStart), privacy: .public)s")
@@ -700,9 +715,11 @@ final class LiveTranslationService: ObservableObject {
     /// here so those call sites don't each need their own `#available`
     /// check around a property that's already nil on older macOS anyway.
     private func cancelAbandonedDirectSession() {
+#if compiler(>=6.2)
         guard #available(macOS 26.0, *) else { return }
         directAppleSession?.cancel()
         directAppleSession = nil
+#endif
     }
 
     /// Google's usage cap is enforced against the *persisted* total, not an
@@ -803,6 +820,7 @@ final class LiveTranslationService: ObservableObject {
         // `translateAndPublish` puts around the whole call. A fresh session
         // is built for this call specifically (not reused across ticks) -
         // see `directAppleSession`'s doc comment for why.
+#if compiler(>=6.2)
         if let source, #available(macOS 26.0, *), await directSessionIsAvailable(source: source, target: target) {
             let sourceLanguage = Locale.Language(identifier: source.rawValue)
             let targetLanguage = Locale.Language(identifier: target.rawValue)
@@ -822,6 +840,7 @@ final class LiveTranslationService: ObservableObject {
             // here, since an abandoned call's `await` above may simply
             // never return once its enclosing task is cancelled.
         }
+#endif
 
         // The SwiftUI-hosted bridged session mounts asynchronously -
         // `.onAppear` runs on SwiftUI's own next render pass, not
@@ -1024,6 +1043,7 @@ final class LiveTranslationService: ObservableObject {
     /// while making the self-referential-cycle class of bug structurally
     /// impossible: there's no recursive call left for a cycle to run away
     /// inside of.
+#if compiler(>=6.2)
     @available(macOS 26.0, *)
     private static func recognizeDocumentGroups(in image: CGImage, fallbackLanguages: [String]) async
         -> [[LiveTranslationSupport.RecognizedLine]] {
@@ -1080,6 +1100,7 @@ final class LiveTranslationService: ObservableObject {
         }
         return groups
     }
+#endif
 }
 
 /// One unit of work for LiveTranslationSessionHost's `for await` loop: the
