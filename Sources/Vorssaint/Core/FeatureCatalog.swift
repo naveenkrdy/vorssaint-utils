@@ -28,7 +28,7 @@ enum AppFeature: String, CaseIterable {
     // Tools
     case quickLauncher, quickToggles, colorPicker, screenOCR, cleaningMode, mediaTools,
          cleaner, uninstaller, homebrew, appUpdates, screenshot, cameraPreview, radialMenu, scratchpad,
-         commandBar, screenRecorder, selectionActions
+         commandBar, screenRecorder, killProcess, selectionActions
     // System monitor, one entry per metric family (temperatures live with
     // their parent metric: CPU temp with CPU, battery temp with power).
     case monitorCPU, monitorGPU, monitorMemory, monitorNetwork, monitorDisk, monitorPower, fanControl
@@ -100,7 +100,7 @@ extension AppFeature {
             return .energyDisplay
         case .quickLauncher, .quickToggles, .colorPicker, .screenOCR, .cleaningMode, .mediaTools,
              .cleaner, .uninstaller, .homebrew, .appUpdates, .screenshot, .cameraPreview, .radialMenu,
-             .scratchpad, .commandBar, .screenRecorder, .selectionActions:
+             .scratchpad, .commandBar, .screenRecorder, .killProcess, .selectionActions:
             return .tools
         case .monitorCPU, .monitorGPU, .monitorMemory, .monitorNetwork, .monitorDisk, .monitorPower,
              .fanControl:
@@ -156,6 +156,7 @@ extension AppFeature {
         case .scratchpad: return "note.text"
         case .commandBar: return "command"
         case .selectionActions: return "selection.pin.in.out"
+        case .killProcess: return "xmark.octagon"
         case .monitorCPU: return "cpu"
         case .monitorGPU: return "rectangle.connected.to.line.below"
         case .monitorMemory: return "memorychip"
@@ -168,7 +169,7 @@ extension AppFeature {
 
     var availabilityKey: String { DefaultsKey.featureAvailable(rawValue) }
 
-    var isBeta: Bool { self == .fanControl || self == .selectionActions }
+    var isBeta: Bool { self == .fanControl || self == .killProcess || self == .selectionActions }
 
     /// Availability read straight from defaults. Existing features stay
     /// available on update; explicit beta opt-ins may start unavailable.
@@ -215,7 +216,7 @@ extension AppFeature {
         case .windowLayout, .diskImageInstaller, .mixer, .micMute, .keepAwake,
              .quickLauncher, .quickToggles, .colorPicker, .screenOCR, .cleaningMode, .mediaTools,
              .cleaner, .uninstaller, .homebrew, .appUpdates, .screenshot, .cameraPreview, .scratchpad,
-             .commandBar, .screenRecorder,
+             .commandBar, .screenRecorder, .killProcess,
              .monitorCPU, .monitorGPU, .monitorMemory, .monitorNetwork, .monitorDisk, .monitorPower,
              .fanControl:
             return []
@@ -264,7 +265,7 @@ extension AppFeature {
         case .clipboardHistory, .shelf, .urlCleaner,
              .soundOutputSwitcher, .musicBlock,
              .extraBrightness, .quickLauncher, .colorPicker, .micMute, .mediaTools,
-             .scratchpad, .monitorGPU, .monitorNetwork, .fanControl:
+             .scratchpad, .monitorGPU, .monitorNetwork, .fanControl, .killProcess:
             return []
         }
     }
@@ -293,7 +294,7 @@ extension AppFeature {
         Dictionary(uniqueKeysWithValues: allCases.map {
             ($0.availabilityKey,
              $0 != .focusFollowsMouse && $0 != .fanControl && $0 != .diskImageInstaller
-                && $0 != .selectionActions)
+                && $0 != .killProcess && $0 != .selectionActions)
         })
     }
 
@@ -334,10 +335,13 @@ extension AppFeature {
                 return AppUpdatesSupport.CheckFrequency
                     .sanitized(stringFor(DefaultsKey.appUpdatesCheckFrequency)) != .off
                     && boolFor(DefaultsKey.appUpdatesNotify)
+            case (.cleaner, .filesAndFolders):
+                return boolFor(DefaultsKey.whatsAppDownloadsEnabled)
             case (.cleaner, .notifications):
                 let cleanerNotifies = (stringFor(DefaultsKey.cleanerScheduleFrequency) ?? "off") != "off"
                     && boolFor(DefaultsKey.cleanerScheduleNotify)
-                let whatsAppNotifies = (boolFor(DefaultsKey.whatsAppDownloadsAutomaticEnabled)
+                let whatsAppNotifies = boolFor(DefaultsKey.whatsAppDownloadsEnabled)
+                    && (boolFor(DefaultsKey.whatsAppDownloadsAutomaticEnabled)
                         || boolFor(DefaultsKey.whatsAppOrganizerEnabled))
                     && boolFor(DefaultsKey.whatsAppDownloadsNotify)
                 return cleanerNotifies || whatsAppNotifies

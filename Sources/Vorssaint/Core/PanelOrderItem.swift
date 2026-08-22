@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Author: naveenkrdy
 // Copyright (C) 2026 Vorssaint
 
 /// A raw-string-backed, drag-reorderable item — conformed to by both the menu
