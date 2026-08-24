@@ -9,6 +9,7 @@ import CoreGraphics
 import Darwin
 import Foundation
 import ImageIO
+import VMStatisticsCompat
 
 // Standalone unit tests for pure helpers. Compiled without IOKit or UI by
 // `./build.sh --test`, so they run fast and deterministically on any machine.
@@ -1369,14 +1370,48 @@ struct MetricsTests {
         // MARK: Memory used
 
         let used = MetricFormat.memoryUsed(totalBytes: 16 * 1024,
+                                           appBytes: 5 * 1024,
                                            pageSize: 1024,
-                                           freePages: 1,
-                                           speculativePages: 2,
-                                           fileBackedPages: 3)
-        expect(used == 10 * 1024, "memory used excludes free, speculative and file-backed pages")
-        expect(MetricFormat.memoryUsed(totalBytes: 16, pageSize: 1,
-                                       freePages: 20, speculativePages: 0, fileBackedPages: 0) == 0,
-               "memory used clamps impossible available memory")
+                                           wiredPages: 2,
+                                           compressorPages: 1,
+                                           tagStoragePages: 1)
+        expect(used == 9 * 1024, "memory used includes app, wired, compressed and tagged storage")
+        expect(MetricFormat.memoryUsed(totalBytes: 16, appBytes: 20,
+                                       pageSize: 1, wiredPages: 0,
+                                       compressorPages: 0, tagStoragePages: 0) == 16,
+               "memory used clamps impossible used memory")
+
+        var vmStats = vorssaint_vm_statistics64_rev3_t()
+        vmStats.wire_count = 2
+        vmStats.purgeable_count = 3
+        vmStats.compressor_page_count = 4
+        vmStats.external_page_count = 5
+        vmStats.internal_page_count = 6
+        vmStats.total_tag_storage_pages = 7
+        expect(VMStatisticsDecoder.decode(vmStats,
+                                          returnedCount: VMStatisticsDecoder.rev1Count - 1) == nil,
+               "VM statistics rejects a truncated legacy payload")
+        expect(VMStatisticsDecoder.decode(vmStats,
+                                          returnedCount: VMStatisticsDecoder.rev1Count) ==
+                   VMStatisticsSnapshot(wiredPages: 2,
+                                        purgeablePages: 3,
+                                        compressorPages: 4,
+                                        externalPages: 5,
+                                        internalPages: 6,
+                                        tagStoragePages: 0),
+               "VM statistics decodes the typed legacy prefix")
+        expect(VMStatisticsDecoder.decode(vmStats,
+                                          returnedCount: VMStatisticsDecoder.rev2Count)?.tagStoragePages == 0,
+               "VM statistics does not read tagged storage from a rev2 payload")
+        expect(VMStatisticsDecoder.decode(vmStats,
+                                          returnedCount: VMStatisticsDecoder.rev3Count)?.tagStoragePages == 7,
+               "VM statistics reads tagged storage from a rev3 payload")
+        expect(VMStatisticsDecoder.validatedTagStoragePages(2, totalBytes: 16, pageSize: 4) == 2,
+               "VM statistics accepts plausible tagged storage")
+        expect(VMStatisticsDecoder.validatedTagStoragePages(5, totalBytes: 16, pageSize: 4) == 0,
+               "VM statistics rejects tagged storage larger than physical memory")
+        expect(VMStatisticsDecoder.validatedTagStoragePages(1, totalBytes: 16, pageSize: 0) == 0,
+               "VM statistics rejects tagged storage without a page size")
 
         // MARK: App memory
 
@@ -2382,6 +2417,8 @@ struct MetricsTests {
         expect(registeredDefaults[DefaultsKey.clipboardHistoryShortcut] as? String
                == GlobalShortcut.clipboardDefault.storageValue,
                "clipboard history shortcut defaults to Ctrl+Opt+Cmd+V")
+        expect(registeredDefaults[DefaultsKey.finderCutPasteShowHUD] as? Bool == true,
+               "the Finder cut and paste floating panel starts enabled")
         expect(registeredDefaults[DefaultsKey.finderRenameEnabled] as? Bool == false,
                "the Finder rename shortcut is opt-in")
         expect(registeredDefaults[DefaultsKey.finderRenameShortcut] as? String == ":120",
@@ -6629,13 +6666,21 @@ struct MetricsTests {
                                                                  volumeIsReadOnly: { _ in false }),
                "apps on a writable external volume stay updatable in place")
         let installerScript = UpdateInstallerSupport.installerScript()
-        for step in ["fail-tempdir", "fail-mount", "fail-no-app-in-dmg",
-                     "fail-copy", "fail-verify", "fail-swap", "note ok"] {
+        for step in ["fail-dmg-verify", "fail-tempdir", "fail-mount", "fail-no-app-in-dmg",
+                     "fail-copy", "fail-version", "fail-verify", "fail-swap", "note ok"] {
             expect(installerScript.contains(step),
                    "installer script reports the \(step) step")
         }
         expect(installerScript.contains("spctl --status"),
                "installer script skips Gatekeeper assessment when the user disabled it")
+        let dmgVerification = installerScript.range(of: "DMG_VERIFY_REQ")
+        let dmgMount = installerScript.range(of: "/usr/bin/hdiutil attach")
+        expect(dmgVerification != nil && dmgMount != nil
+               && dmgVerification!.lowerBound < dmgMount!.lowerBound,
+               "installer verifies the release signer before mounting the DMG")
+        expect(installerScript.contains("BUNDLE_VERSION=")
+               && installerScript.contains("\"$BUNDLE_VERSION\" = \"$EXPECTED_VERSION\""),
+               "installer requires the signed app to match the offered release version")
         expect(installerScript.contains("chown -R"),
                "an elevated install hands the bundle back to the user")
         expect(installerScript.contains("update-old.$PID"),
@@ -6654,11 +6699,14 @@ struct MetricsTests {
             dmgPath: "/tmp/Vorssaint-update.dmg",
             pid: 123,
             resultPath: "/tmp/result",
-            uid: 501)
+            uid: 501,
+            expectedVersion: "3.3.3")
         expect(elevated.contains("nohup") && elevated.hasSuffix("&"),
                "elevated installer detaches so the app can quit")
         expect(elevated.contains("'/Applications/Vorssaint.app'"),
                "elevated installer passes the app path quoted for the shell")
+        expect(elevated.contains("'3.3.3'"),
+               "elevated installer passes the expected version quoted for the shell")
 
         // MARK: - UpdateServiceSupport & SemVer channel reconciliation
 
@@ -6695,8 +6743,8 @@ struct MetricsTests {
                "beta is not newer than the released final version")
 
         // Release candidate selection
-        let dummyDMG = URL(string: "https://github.com/vorssaint/vorssaint-utils/releases/download/v3.3.4/Vorssaint.dmg")!
-        let dummyBetaDMG = URL(string: "https://github.com/vorssaint/vorssaint-utils/releases/download/v3.3.4-beta.1/Vorssaint.dmg")!
+        let dummyDMG = URL(string: "https://github.com/vorssaintapp/vorssaint-utils/releases/download/v3.3.4/Vorssaint.dmg")!
+        let dummyBetaDMG = URL(string: "https://github.com/vorssaintapp/vorssaint-utils/releases/download/v3.3.4-beta.1/Vorssaint.dmg")!
 
         let candidateList = [
             UpdateServiceSupport.ReleaseCandidate(tagName: "v3.3.4-beta.1", isPrerelease: true, isDraft: false, dmgURL: dummyBetaDMG, dmgExpectedBytes: 1000, body: "Beta notes"),
@@ -6712,6 +6760,14 @@ struct MetricsTests {
 
         let selectedFromHigherBeta = UpdateServiceSupport.selectUpdate(from: candidateList, currentVersion: "3.3.4-beta.1", includeBetas: false)
         expect(selectedFromHigherBeta == nil, "user on beta turning off betas does not downgrade to older stable")
+
+        let knownDigest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        expect(UpdateServiceSupport.sha256Matches(Data("abc".utf8), expectedHex: knownDigest),
+               "update media accepts its pinned SHA-256 digest")
+        expect(!UpdateServiceSupport.sha256Matches(Data("altered".utf8), expectedHex: knownDigest),
+               "update media rejects content that does not match its pinned digest")
+        expect(!UpdateServiceSupport.sha256Matches(Data("abc".utf8), expectedHex: "invalid"),
+               "update media rejects a malformed pinned digest")
 
         // Defaults registered
         expect(Defaults.registeredDefaults[DefaultsKey.includeBetaUpdates] as? Bool == false,
@@ -7700,6 +7756,64 @@ struct MetricsTests {
                                                                  selectedIndex: 2,
                                                                  delta: 1) == 2,
                "App Switcher icon-row window navigation stays put when the app has one window")
+        expect(SwitcherSupport.iconRowEdgeHoverInterval > SwitcherSupport.iconRowEdgeHoverAnimationDuration
+               && SwitcherSupport.iconRowEdgeHoverRepeatInterval >= SwitcherSupport.iconRowEdgeHoverAnimationDuration
+               && SwitcherSupport.iconRowEdgeHoverRepeatInterval < SwitcherSupport.iconRowEdgeHoverInterval
+               && SwitcherSupport.iconRowEdgeHoverAnimationDuration > 0.15,
+               "App Switcher overflow hover waits to start, then steps with the slide")
+        expect(SwitcherSupport.clampedIconRowFirstVisibleIndex(itemCount: 12,
+                                                              visibleCount: 6,
+                                                              firstVisibleIndex: -2) == 0
+               && SwitcherSupport.clampedIconRowFirstVisibleIndex(itemCount: 12,
+                                                                 visibleCount: 6,
+                                                                 firstVisibleIndex: 20) == 6
+               && SwitcherSupport.clampedIconRowFirstVisibleIndex(itemCount: 5,
+                                                                 visibleCount: 6,
+                                                                 firstVisibleIndex: 3) == 0,
+               "App Switcher overflow row never scrolls past either end")
+        expect(SwitcherSupport.iconRowFirstVisibleIndex(revealing: 8,
+                                                        itemCount: 12,
+                                                        visibleCount: 6,
+                                                        currentFirstVisibleIndex: 0) == 3
+               && SwitcherSupport.iconRowFirstVisibleIndex(revealing: 1,
+                                                           itemCount: 12,
+                                                           visibleCount: 6,
+                                                           currentFirstVisibleIndex: 3) == 1
+               && SwitcherSupport.iconRowFirstVisibleIndex(revealing: 4,
+                                                           itemCount: 12,
+                                                           visibleCount: 6,
+                                                           currentFirstVisibleIndex: 3) == 3,
+               "App Switcher overflow row slides just far enough to keep the selection visible")
+        expect(SwitcherSupport.iconRowEdgeHoverDelta(hoveredIndex: 5,
+                                                     firstVisibleIndex: 0,
+                                                     visibleCount: 6,
+                                                     itemCount: 12) == 1
+               && SwitcherSupport.iconRowEdgeHoverDelta(hoveredIndex: 3,
+                                                        firstVisibleIndex: 3,
+                                                        visibleCount: 6,
+                                                        itemCount: 12) == -1
+               && SwitcherSupport.iconRowEdgeHoverDelta(hoveredIndex: 2,
+                                                        firstVisibleIndex: 0,
+                                                        visibleCount: 6,
+                                                        itemCount: 12) == nil
+               && SwitcherSupport.iconRowEdgeHoverDelta(hoveredIndex: 5,
+                                                        firstVisibleIndex: 6,
+                                                        visibleCount: 6,
+                                                        itemCount: 12) == nil
+               && SwitcherSupport.iconRowEdgeHoverDelta(hoveredIndex: 3,
+                                                        firstVisibleIndex: 0,
+                                                        visibleCount: 6,
+                                                        itemCount: 5) == nil,
+               "App Switcher overflow hover only steps from the last visible icon on a side")
+        expect(SwitcherSupport.iconRowIndexAfterEdgeHoverStep(firstVisibleIndex: 1,
+                                                              visibleCount: 6,
+                                                              itemCount: 12,
+                                                              delta: 1) == 6
+               && SwitcherSupport.iconRowIndexAfterEdgeHoverStep(firstVisibleIndex: 2,
+                                                                 visibleCount: 6,
+                                                                 itemCount: 12,
+                                                                 delta: -1) == 2,
+               "App Switcher overflow hover lands on the newly revealed last visible icon")
         let frontmostScoped = SwitcherSupport.frontmostAppWindows(allItems: groupedSwitcherItems,
                                                                     frontmostPID: 101)
         expect(frontmostScoped.count == 2
@@ -13688,6 +13802,9 @@ struct MetricsTests {
         expect(Defaults.registeredDefaults[DefaultsKey.finderPasteImageAsFile] as? Bool == false
                 && backupKeys.contains(DefaultsKey.finderPasteImageAsFile),
                "pasting copied images as files is opt-in and travels with settings backup")
+        expect(Defaults.registeredDefaults[DefaultsKey.finderCutPasteShowHUD] as? Bool == true
+                && backupKeys.contains(DefaultsKey.finderCutPasteShowHUD),
+               "the Finder cut and paste floating panel default is on and travels with settings backup")
         expect(backupKeys.contains(DefaultsKey.windowPreviewExcludedApps)
                 && (Defaults.registeredDefaults[DefaultsKey.windowPreviewExcludedApps] as? [String]) == [],
                "the window preview exclusion list starts empty and travels with the settings backup")

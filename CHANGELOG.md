@@ -14,12 +14,15 @@ All notable changes to this project are documented here. The format follows
 - The radial menu editor now includes a broader built-in SF Symbol catalog with runtime availability filtering. Thanks to @ruvelro.
 - Sound Mixer now includes an option to hide inactive applications while keeping custom volume and output selections visible. Thanks to @ruvelro.
 - Sound Mixer now includes an option to use finer volume steps with keyboard volume keys and rollers. Thanks to @ruvelro.
+- Finder Cut & Paste now includes an option in Settings to show or hide the floating panel for staged files, and automatically hides the panel when Finder is in the background.
 
 ### Changed
 - Sound Mixer panel now groups audio devices and organizes preferences in a collapsible Options section.
 - Embedded utilities in the Quick Launcher now provide distinct Back and Close buttons. Thanks to @ruvelro.
 
 ### Fixed
+- System metrics now accurately report used memory by including hardware-reserved tagged memory on supported hardware. Thanks to @pergioa and @PathGao.
+- App Switcher now steps one icon at a time when hovering the edge of an overflowing icon row instead of scrolling continuously. Thanks to @BenjaminD2023.
 - App Switcher now scales windowless app icons and labels proportionally when preview size is set to small. Thanks to @Yahddyyp.
 - Screenshot editor now opens the full-resolution image when editing a file copied in Finder instead of its preview icon. Thanks to @iltonandrew.
 - App Switcher now shows an application's user-selected alternate icon instead of the default bundled icon. Thanks to @iltonandrew and @EugeneCarldotme.
@@ -1508,7 +1511,7 @@ Vorssaint 3.1.0 adds three optional tools: Clipboard History for saving and reus
   default, with a setting to split them into separate CPU°C, GPU°C and BAT°C
   blocks.
 
-![Menu bar temperature metrics](https://raw.githubusercontent.com/vorssaint/vorssaint-utils/main/Resources/Images/menu-bar-temperature-metrics.png)
+![Menu bar temperature metrics](https://raw.githubusercontent.com/vorssaintapp/vorssaint-utils/main/Resources/Images/menu-bar-temperature-metrics.png)
 
 ## [3.0.7] - 2026-06-20
 
