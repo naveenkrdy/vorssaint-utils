@@ -280,6 +280,22 @@ enum ClipboardHistoryPreview {
     }
 }
 
+enum ClipboardHistoryEscape {
+    enum Action: Equatable {
+        case clearBatchSelection
+        case hideWindow
+    }
+
+    /// Esc backs out one layer at a time - selection, then the window.
+    /// Preview is a persistent view setting, not a layer: it stays open
+    /// until its own toggle (the button, or Space for Quick Look) is used,
+    /// so a keystroke meant to close the panel can never silently re-hide
+    /// it first.
+    static func action(batchCount: Int) -> Action {
+        batchCount > 0 ? .clearBatchSelection : .hideWindow
+    }
+}
+
 enum ClipboardHistoryBatch {
     static func combinedText(_ texts: [String]) -> String {
         texts.joined(separator: "\n")
