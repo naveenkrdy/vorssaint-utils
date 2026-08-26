@@ -33,15 +33,19 @@ enum LiveTranslationKeyStore {
             return true
         }
         let data = Data(key.utf8)
+        // Set on both paths, not just add: an update that only wrote
+        // kSecValueData left an existing item's accessibility exactly as it
+        // was first created, silently diverging from this constant if it
+        // ever changes.
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+        ]
         let status: OSStatus
         if read() != nil {
-            let update: [String: Any] = [kSecValueData as String: data]
-            status = SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
+            status = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
         } else {
-            var add = baseQuery
-            add[kSecValueData as String] = data
-            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            status = SecItemAdd(add as CFDictionary, nil)
+            status = SecItemAdd(baseQuery.merging(attributes) { $1 } as CFDictionary, nil)
         }
         return status == errSecSuccess
     }
