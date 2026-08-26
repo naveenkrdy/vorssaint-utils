@@ -195,6 +195,11 @@ struct GeneralSettings: View {
                     }
                 }
                 .pickerStyle(.segmented)
+#if compiler(>=6.2)
+                if #available(macOS 26.0, *) {
+                    Toggle(appearanceStrings.liquidGlass, isOn: $appearance.liquidGlassEnabled)
+                }
+#endif
             }
             Section(l10n.s.menuBarSection) {
                 Button(l10n.s.showMenuBarIcon) {
@@ -404,6 +409,8 @@ struct EnergySettings: View {
     @AppStorage(DefaultsKey.brightnessOSDEnabled) private var brightnessOSDEnabled = false
     @AppStorage(DefaultsKey.extraBrightnessEnabled) private var extraBrightnessEnabled = false
     @AppStorage(DefaultsKey.extraBrightnessLevel) private var extraBrightnessLevel = 100
+    @AppStorage(DefaultsKey.bluetoothSleepEnabled) private var bluetoothSleepEnabled = false
+    @AppStorage(DefaultsKey.bluetoothSleepRestoreOnWake) private var bluetoothSleepRestoreOnWake = true
     @AppStorage(DefaultsKey.defaultDuration) private var defaultDuration = 0
     @AppStorage(DefaultsKey.batteryLimit) private var batteryLimit = 10
     @AppStorage(DefaultsKey.keepAwakeAutoStart) private var keepAwakeAutoStart = false
@@ -560,6 +567,27 @@ struct EnergySettings: View {
                     }
                 }
                 .settingsSectionAnchor(.extraBrightness)
+            }
+            if AppFeature.bluetoothSleep.isAvailable {
+                let strings = FeatureStrings.bluetoothSleep(l10n.language)
+                Section(strings.pageTitle) {
+                    if BluetoothSleepService.isSupported {
+                        SettingsToggleWithCaption(title: strings.enable,
+                                                  caption: strings.enableCaption,
+                                                  isOn: $bluetoothSleepEnabled)
+                            .onChange(of: bluetoothSleepEnabled) { _, _ in
+                                BluetoothSleepService.shared.syncWithPreferences()
+                            }
+                        if bluetoothSleepEnabled {
+                            SettingsToggleWithCaption(title: strings.restoreToggle,
+                                                      caption: strings.restoreCaption,
+                                                      isOn: $bluetoothSleepRestoreOnWake)
+                        }
+                    } else {
+                        SettingsCaptionText(strings.unsupported)
+                    }
+                }
+                .settingsSectionAnchor(.bluetoothSleep)
             }
         }
         .formStyle(.grouped)
@@ -844,6 +872,8 @@ struct SwitcherSettings: View {
     @AppStorage(DefaultsKey.switcherSimpleMode) private var switcherSimpleMode = false
     @AppStorage(DefaultsKey.switcherMergeTabs) private var switcherMergeTabs = false
     @AppStorage(DefaultsKey.switcherWindowlessApps) private var switcherWindowlessApps = SwitcherWindowlessApps.fallback.rawValue
+    @AppStorage(DefaultsKey.switcherMinimizedPlacement) private var switcherMinimizedPlacement = WindowSwitchMinimizedPlacement.normal.rawValue
+    @AppStorage(DefaultsKey.switcherShowFullscreenWindows) private var switcherShowFullscreenWindows = true
     @AppStorage(DefaultsKey.switcherCurrentSpaceOnly) private var switcherCurrentSpaceOnly = false
     @AppStorage(DefaultsKey.switcherSearchPinEnabled) private var switcherSearchPinEnabled = false
     @AppStorage(DefaultsKey.switcherShowShortcutHints) private var switcherShowShortcutHints = true
@@ -929,6 +959,22 @@ struct SwitcherSettings: View {
                     Text(l10n.s.switcherMergeTabsCaption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Picker(l10n.s.switcherMinimizedPlacementLabel, selection: $switcherMinimizedPlacement) {
+                        Text(l10n.s.switcherMinimizedPlacementNormal).tag(WindowSwitchMinimizedPlacement.normal.rawValue)
+                        Text(l10n.s.switcherMinimizedPlacementEnd).tag(WindowSwitchMinimizedPlacement.end.rawValue)
+                        Text(l10n.s.switcherMinimizedPlacementHidden).tag(WindowSwitchMinimizedPlacement.hidden.rawValue)
+                    }
+                    .disabled(!switcherEnabled)
+                    .onChange(of: switcherMinimizedPlacement) { _, _ in
+                        AppSwitcher.shared.syncWithPreferences()
+                    }
+
+                    Toggle(l10n.s.switcherShowFullscreenWindows, isOn: $switcherShowFullscreenWindows)
+                        .disabled(!switcherEnabled)
+                        .onChange(of: switcherShowFullscreenWindows) { _, _ in
+                            AppSwitcher.shared.syncWithPreferences()
+                        }
 
                     Toggle(l10n.s.switcherCurrentSpaceOnly, isOn: $switcherCurrentSpaceOnly)
                         .disabled(!switcherEnabled)
