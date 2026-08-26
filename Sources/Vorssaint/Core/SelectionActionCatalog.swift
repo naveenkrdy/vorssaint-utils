@@ -98,6 +98,8 @@ enum SelectionAction: String, CaseIterable, Identifiable, PanelOrderItem {
         case .paste, .pastePlain:
             return NSPasteboard.general.string(forType: .string) != nil
         case .calculate: return SelectionActionCatalog.looksLikeExpression(text)
+        case .urlDecode: return text.contains("%")
+        case .base64Decode: return Data(base64Encoded: text) != nil
         case .addToScratchpad: return AppFeature.scratchpad.isAvailable
         default: return true
         }
@@ -168,7 +170,19 @@ enum SelectionActionCatalog {
         guard trimmed.count >= 3, trimmed.contains(where: \.isNumber) else { return false }
         let allowed = CharacterSet(charactersIn: "0123456789.+-*/()% ")
         guard trimmed.unicodeScalars.allSatisfy(allowed.contains) else { return false }
-        return trimmed.contains(where: { "+-*/%".contains($0) })
+        guard trimmed.contains(where: { "+-*/%".contains($0) }) else { return false }
+        // A run of digit groups joined only by hyphens, with no spaces or
+        // other operators - 2026-08-26, 555-1234, 10-20 - reads as a date,
+        // a phone number or a range far more often than as a subtraction
+        // someone wants Calculate to run silently. Syntactically valid
+        // arithmetic, rejected anyway.
+        return !isHyphenatedDigitGroups(trimmed)
+    }
+
+    private static func isHyphenatedDigitGroups(_ text: String) -> Bool {
+        let groups = text.split(separator: "-", omittingEmptySubsequences: false)
+        guard groups.count >= 2 else { return false }
+        return groups.allSatisfy { !$0.isEmpty && $0.allSatisfy(\.isNumber) }
     }
 }
 
@@ -185,7 +199,11 @@ enum TextListGranularity {
 enum TextListSupport {
     static func granularity(of text: String) -> TextListGranularity {
         if text.contains(where: \.isNewline) {
-            return .lines(text.components(separatedBy: .newlines))
+            // `.newlines` matches `\r` and `\n` as separate members, so
+            // splitting a CRLF file on it directly inserts a spurious blank
+            // line between every pair of real lines. Normalize first.
+            let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+            return .lines(normalized.components(separatedBy: .newlines))
         }
         let words = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         if words.count > 1 {
@@ -194,11 +212,21 @@ enum TextListSupport {
         return .letters(Array(text))
     }
 
+    /// Locale-aware and numeric-aware: plain `<` sorts by raw Unicode scalar
+    /// value, which puts "10" before "2" and capital letters before every
+    /// lowercase one - not what someone sorting a list of lines expects.
     static func sorted(_ text: String) -> String {
         switch granularity(of: text) {
-        case .lines(let items): return items.sorted().joined(separator: "\n")
-        case .words(let items): return items.sorted().joined(separator: " ")
-        case .letters(let items): return String(items.sorted())
+        case .lines(let items):
+            return items.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+                .joined(separator: "\n")
+        case .words(let items):
+            return items.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+                .joined(separator: " ")
+        case .letters(let items):
+            return String(items.sorted {
+                String($0).localizedStandardCompare(String($1)) == .orderedAscending
+            })
         }
     }
 
