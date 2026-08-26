@@ -623,12 +623,25 @@ final class LiveTranslationService: ObservableObject {
         var googleCharacters = 0
         var googleWords = 0
         if providerRaw == "google" {
-            googleCharacters = uniqueTexts.reduce(0) { $0 + $1.count }
+            // Google bills by Unicode code point, not by Swift's grapheme-
+            // cluster String.count - unicodeScalars.count is what actually
+            // matches the invoice for any text with combining marks, most
+            // emoji, or other multi-scalar graphemes.
+            googleCharacters = uniqueTexts.reduce(0) { $0 + $1.unicodeScalars.count }
             googleWords = uniqueTexts.reduce(0) { $0 + $1.split(separator: " ").count }
             if googleUsageWouldExceedCap(characters: googleCharacters) {
                 await publish(status: .usageCapReached, generation: generation)
                 return
             }
+            // Recorded before the request goes out, not after it succeeds:
+            // recording only on success left a window where two overlapping
+            // ticks could each pass the gate above before either recorded,
+            // letting the real total overshoot the cap. Reversed below only
+            // for the one failure that provably never reached Google - a
+            // missing key never leaves this process. A timeout or a real
+            // HTTP response from Google's servers cannot be proven unbilled,
+            // so those charges stand.
+            await recordGoogleUsage(characters: googleCharacters, words: googleWords)
         }
 
         // A flat 6s was measured comfortably covering a normal-sized capture
@@ -646,12 +659,6 @@ final class LiveTranslationService: ObservableObject {
             }
             liveTranslationDiagLog.notice("translate succeeded in \(Date().timeIntervalSince(translateStart), privacy: .public)s, \(translatedTexts.count, privacy: .public) results")
             guard self.generation == generation else { return }
-            if providerRaw == "google" {
-                // Only counted on success - a failed/errored call was never
-                // actually billed, so it shouldn't count against the cap
-                // either.
-                await recordGoogleUsage(characters: googleCharacters, words: googleWords)
-            }
             for (position, uniqueText) in uniqueTexts.enumerated() {
                 let result = position < translatedTexts.count ? translatedTexts[position] : ""
                 translationCache[uniqueText] = result
@@ -661,17 +668,29 @@ final class LiveTranslationService: ObservableObject {
             }
             await publishFromResults(resultsByIndex)
         } catch is DeadlineExceeded {
-            liveTranslationDiagLog.notice("translate deadline (\(translateDeadline, privacy: .public)s) exceeded after \(Date().timeIntervalSince(translateStart), privacy: .public)s, texts=\(uniqueTexts.count, privacy: .public), totalChars=\(uniqueTexts.reduce(0) { $0 + $1.count }, privacy: .public)")
+            liveTranslationDiagLog.notice("translate deadline (\(translateDeadline, privacy: .public)s) exceeded after \(Date().timeIntervalSince(translateStart), privacy: .public)s, texts=\(uniqueTexts.count, privacy: .public), totalChars=\(uniqueTexts.reduce(0) { $0 + $1.unicodeScalars.count }, privacy: .public)")
             // See directAppleSession's doc comment - this is the outer scope
             // that has to do the cancelling, since the abandoned call's own
             // await may never return to reach its own catch block.
             cancelAbandonedDirectSession()
             await publish(status: .timedOut, generation: generation)
+        } catch TranslationProviderError.missingAPIKey {
+            // The one failure that provably never reached Google: thrown by
+            // GoogleTranslationProvider before it ever opens a connection, so
+            // the reservation above was never earned.
+            if providerRaw == "google" {
+                await recordGoogleUsage(characters: -googleCharacters, words: -googleWords)
+            }
+            liveTranslationDiagLog.notice("translate failed with TranslationProviderError: missingAPIKey")
+            await publish(status: Self.status(for: .missingAPIKey), generation: generation)
         } catch let error as TranslationProviderError {
-            liveTranslationDiagLog.notice("translate failed with TranslationProviderError: \(String(describing: error), privacy: .public)")
+            // .private, not .public: a network error's description can embed
+            // the failing request (URL, headers), and this path carries the
+            // Google provider's requests.
+            liveTranslationDiagLog.notice("translate failed with TranslationProviderError: \(String(describing: error), privacy: .private)")
             await publish(status: Self.status(for: error), generation: generation)
         } catch {
-            liveTranslationDiagLog.notice("translate failed with error: \(String(describing: error), privacy: .public)")
+            liveTranslationDiagLog.notice("translate failed with error: \(String(describing: error), privacy: .private)")
             cancelAbandonedDirectSession()
             await publish(status: .failed, generation: generation)
         }

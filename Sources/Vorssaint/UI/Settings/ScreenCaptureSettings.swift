@@ -234,6 +234,8 @@ private struct LiveTranslationCaptureSettings: View {
     @AppStorage(DefaultsKey.liveTranslationStrategy) private var strategy = "lowLatency"
     @AppStorage(DefaultsKey.liveTranslationProvider) private var provider = "apple"
     @State private var googleAPIKey = LiveTranslationKeyStore.read() ?? ""
+    @FocusState private var googleAPIKeyFieldFocused: Bool
+    @State private var apiKeySaveFailed = false
     @AppStorage(DefaultsKey.liveTranslationGoogleCharacterCount) private var googleCharacterCount = 0
     @AppStorage(DefaultsKey.liveTranslationGoogleWordCount) private var googleWordCount = 0
     @AppStorage(DefaultsKey.liveTranslationGoogleUsageCapEnabled) private var usageCapEnabled = false
@@ -269,6 +271,13 @@ private struct LiveTranslationCaptureSettings: View {
 
     private var engineStatusText: String {
         strings.engineLabel + ": " + strings.engineCompatibility
+    }
+
+    /// Writes the field's current value to the Keychain once, on submit or
+    /// when focus leaves the field - not on every keystroke, which would
+    /// otherwise hit Keychain I/O for each character typed.
+    private func saveGoogleAPIKey() {
+        apiKeySaveFailed = !LiveTranslationKeyStore.save(googleAPIKey)
     }
 
     var body: some View {
@@ -346,12 +355,24 @@ private struct LiveTranslationCaptureSettings: View {
 
             if provider == "google" {
                 SecureField(strings.googleAPIKeyLabel, text: $googleAPIKey)
-                    .onChange(of: googleAPIKey) { _, newValue in
-                        LiveTranslationKeyStore.save(newValue)
+                    .focused($googleAPIKeyFieldFocused)
+                    .onSubmit(saveGoogleAPIKey)
+                    .onChange(of: googleAPIKeyFieldFocused) { wasFocused, isFocused in
+                        if wasFocused, !isFocused { saveGoogleAPIKey() }
                     }
+                    // The settings pane can close while the field is still
+                    // focused, which never fires the focus-lost branch above -
+                    // a last-chance save so a key typed just before closing
+                    // isn't silently lost.
+                    .onDisappear(perform: saveGoogleAPIKey)
                 Text(strings.googleAPIKeyCaption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if apiKeySaveFailed {
+                    Text(strings.googleAPIKeySaveFailed)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
                 Text(strings.googlePrivacyNote)
                     .font(.caption)
                     .foregroundStyle(.orange)

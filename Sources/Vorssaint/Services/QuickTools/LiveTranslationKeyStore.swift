@@ -24,21 +24,26 @@ enum LiveTranslationKeyStore {
         return String(data: data, encoding: .utf8)
     }
 
-    static func save(_ key: String) {
+    /// Returns whether the write actually succeeded, so a caller can tell
+    /// the person their key wasn't saved instead of assuming it was.
+    @discardableResult
+    static func save(_ key: String) -> Bool {
         guard !key.isEmpty else {
             delete()
-            return
+            return true
         }
         let data = Data(key.utf8)
+        let status: OSStatus
         if read() != nil {
             let update: [String: Any] = [kSecValueData as String: data]
-            SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
+            status = SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
         } else {
             var add = baseQuery
             add[kSecValueData as String] = data
             add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            SecItemAdd(add as CFDictionary, nil)
+            status = SecItemAdd(add as CFDictionary, nil)
         }
+        return status == errSecSuccess
     }
 
     static func delete() {

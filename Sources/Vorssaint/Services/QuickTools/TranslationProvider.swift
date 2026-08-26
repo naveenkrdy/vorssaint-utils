@@ -60,9 +60,6 @@ struct GoogleTranslationProvider: TranslationProvider {
             throw TranslationProviderError.missingAPIKey
         }
 
-        var components = URLComponents(url: Self.endpoint, resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "key", value: key)]
-
         var body: [String: Any] = [
             "q": texts,
             "target": LiveTranslationSupport.googleLanguageTag(target),
@@ -70,9 +67,16 @@ struct GoogleTranslationProvider: TranslationProvider {
         ]
         if let source { body["source"] = LiveTranslationSupport.googleLanguageTag(source) }
 
-        var request = URLRequest(url: components.url ?? Self.endpoint)
+        // The key travels as a header, not a `?key=` query parameter: a
+        // failing request's URL can end up in logs or crash reports (see the
+        // batchTranslate/translate diagnostic logging in
+        // LiveTranslationService), and a header never gets echoed there the
+        // way a URL does. Google's REST APIs accept this as an equivalent to
+        // the query parameter for API-key auth.
+        var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(key, forHTTPHeaderField: "X-Goog-Api-Key")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let data: Data
