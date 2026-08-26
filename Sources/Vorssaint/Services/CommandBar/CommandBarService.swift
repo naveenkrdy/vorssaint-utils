@@ -372,12 +372,14 @@ final class CommandBarService: ObservableObject {
         // click) skipped the reset stepBack() does for the same mode -
         // AppUninstaller kept its selected target and scanned checklist,
         // which then showed up unprompted in Settings and the menu panel.
-        // Guarded the same way: don't tear down a Homebrew removal that's
-        // still actually running in the background.
+        // Guarded the same way: don't tear down a removal - Homebrew or
+        // plain - that's still actually running in the background.
         switch mode {
         case .uninstallReview, .uninstallHomebrewConfirm:
             let uninstaller = AppUninstaller.shared
-            if !uninstaller.isRemovingWithHomebrew { uninstaller.reset() }
+            if uninstaller.phase != .removing, !uninstaller.isRemovingWithHomebrew {
+                uninstaller.reset()
+            }
         default:
             break
         }
@@ -1976,7 +1978,9 @@ final class CommandBarService: ObservableObject {
                 finishUninstallReview()
             } else {
                 let uninstaller = AppUninstaller.shared
-                if !uninstaller.isRemovingWithHomebrew { uninstaller.reset() }
+                if uninstaller.phase != .removing, !uninstaller.isRemovingWithHomebrew {
+                    uninstaller.reset()
+                }
                 mode = .search
                 query = savedQuery
                 refreshResults()
