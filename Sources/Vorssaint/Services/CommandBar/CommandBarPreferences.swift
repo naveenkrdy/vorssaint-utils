@@ -293,7 +293,7 @@ enum CommandBarPreferences {
     private static func isHubOwned(_ rowID: String) -> Bool {
         switch source(ofRowID: rowID) {
         case .actions, .settingsPages, .snippets: return true
-        case .apps, .menus, .windows, .quitApps, .macSettings, .clipboard, .emoji,
+        case .apps, .uninstallApps, .menus, .windows, .quitApps, .macSettings, .clipboard, .emoji,
              .folders, .answers, .calculator, .selection, .links, .files, .killProcess:
             return false
         }
