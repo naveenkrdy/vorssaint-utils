@@ -97,7 +97,12 @@ enum SelectionAction: String, CaseIterable, Identifiable, PanelOrderItem {
         switch self {
         case .paste, .pastePlain:
             return NSPasteboard.general.string(forType: .string) != nil
-        case .calculate: return SelectionActionCatalog.looksLikeExpression(text)
+        // looksLikeExpression is a charset prefilter, not the parser - it
+        // rejects prose cheaply, but "50%", "1/0" and "(1+2" all pass it and
+        // then return nil from the evaluator. Same shape as the two decode
+        // guards below: run the actual operation, don't approximate it.
+        case .calculate:
+            return SelectionActionCatalog.looksLikeExpression(text) && ArithmeticEvaluator.evaluate(text) != nil
         // Running the actual decode instead of approximating it: a stray
         // "%" (as in "100% sure") isn't valid percent-encoding, and a plain
         // word ("test", "code") is a syntactically valid but meaningless
