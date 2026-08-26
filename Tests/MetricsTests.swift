@@ -360,7 +360,7 @@ struct MetricsTests {
         expect(!ClipboardHistoryPreview.handlesSpace(selectionIsVisible: true, hasModifiers: true),
                "clipboard preview never steals modified Space shortcuts")
         expect(ClipboardHistoryEscape.action(batchCount: 0) == .hideWindow,
-               "Esc closes the panel when nothing is selected, regardless of preview")
+               "Esc closes the panel when nothing is selected")
         expect(ClipboardHistoryEscape.action(batchCount: 2) == .clearBatchSelection,
                "Esc clears a batch selection before it closes the panel")
         expect(ClipboardHistoryEditing.canSave(original: "First draft", draft: "Second draft"),
