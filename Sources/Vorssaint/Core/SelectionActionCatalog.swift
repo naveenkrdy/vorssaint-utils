@@ -98,8 +98,14 @@ enum SelectionAction: String, CaseIterable, Identifiable, PanelOrderItem {
         case .paste, .pastePlain:
             return NSPasteboard.general.string(forType: .string) != nil
         case .calculate: return SelectionActionCatalog.looksLikeExpression(text)
-        case .urlDecode: return text.contains("%")
-        case .base64Decode: return Data(base64Encoded: text) != nil
+        // Running the actual decode instead of approximating it: a stray
+        // "%" (as in "100% sure") isn't valid percent-encoding, and a plain
+        // word ("test", "code") is a syntactically valid but meaningless
+        // base64 decode. Both guards below run the same operation the
+        // action itself would, so a click never no-ops.
+        case .urlDecode: return text.removingPercentEncoding.map { $0 != text } ?? false
+        case .base64Decode:
+            return Data(base64Encoded: text).flatMap { String(data: $0, encoding: .utf8) } != nil
         case .addToScratchpad: return AppFeature.scratchpad.isAvailable
         default: return true
         }
