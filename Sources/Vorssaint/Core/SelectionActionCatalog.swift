@@ -13,7 +13,26 @@ enum SelectionAction: String, CaseIterable, Identifiable, PanelOrderItem {
     case copy
     case cut
     case paste
+    case pastePlain
     case delete
+    case uppercase
+    case lowercase
+    case capitalize
+    case removeSpaces
+    case underscore
+    case joinLines
+    case commaList
+    case sort
+    case reverse
+    case random
+    case quotes
+    case brackets
+    case urlEncode
+    case urlDecode
+    case base64Encode
+    case base64Decode
+    case calculate
+    case addToScratchpad
 
     var id: String { rawValue }
 
@@ -22,7 +41,26 @@ enum SelectionAction: String, CaseIterable, Identifiable, PanelOrderItem {
         case .copy: return "doc.on.doc"
         case .cut: return "scissors"
         case .paste: return "clipboard"
+        case .pastePlain: return "sparkle.text.clipboard"
         case .delete: return "delete.left"
+        case .uppercase: return "textformat.size.larger"
+        case .lowercase: return "textformat.size.smaller"
+        case .capitalize: return "textformat.abc"
+        case .removeSpaces: return "eraser.line.dashed"
+        case .underscore: return "underline"
+        case .joinLines: return "arrow.triangle.merge"
+        case .commaList: return "list.bullet.badge.ellipsis"
+        case .sort: return "arrow.up.arrow.down"
+        case .reverse: return "arrow.triangle.swap"
+        case .random: return "shuffle"
+        case .quotes: return "quote.opening"
+        case .brackets: return "parentheses"
+        case .urlEncode: return "arrow.right.to.line"
+        case .urlDecode: return "arrow.left.to.line"
+        case .base64Encode: return "chevron.right.2"
+        case .base64Decode: return "chevron.left.2"
+        case .calculate: return "function"
+        case .addToScratchpad: return "note.text"
         }
     }
 
@@ -30,9 +68,12 @@ enum SelectionAction: String, CaseIterable, Identifiable, PanelOrderItem {
     /// rather than just reading it.
     var isTransform: Bool {
         switch self {
-        case .cut, .paste, .delete:
+        case .cut, .paste, .pastePlain, .delete,
+             .uppercase, .lowercase, .capitalize, .removeSpaces, .underscore,
+             .joinLines, .commaList, .sort, .reverse, .random, .quotes, .brackets,
+             .urlEncode, .urlDecode, .base64Encode, .base64Decode, .calculate:
             return true
-        case .copy:
+        case .copy, .addToScratchpad:
             return false
         }
     }
@@ -52,10 +93,12 @@ enum SelectionAction: String, CaseIterable, Identifiable, PanelOrderItem {
     /// except Paste itself.
     func appliesTo(text: String, isEditable: Bool) -> Bool {
         if isTransform, !isEditable { return false }
-        if text.isEmpty, self != .paste { return false }
+        if text.isEmpty, self != .paste, self != .pastePlain { return false }
         switch self {
-        case .paste:
+        case .paste, .pastePlain:
             return NSPasteboard.general.string(forType: .string) != nil
+        case .calculate: return SelectionActionCatalog.looksLikeExpression(text)
+        case .addToScratchpad: return AppFeature.scratchpad.isAvailable
         default: return true
         }
     }
@@ -75,7 +118,7 @@ enum SelectionActionCatalog {
     /// The everyday actions a fresh install starts with; everything else is
     /// one switch away in Settings rather than cluttering the bar by default.
     static let defaultEnabled: Set<SelectionAction> = [
-        .copy, .cut, .paste,
+        .copy, .cut, .paste, .calculate,
     ]
 
     /// Persisted as the *enabled* set, not the disabled one: a future update
@@ -115,5 +158,137 @@ enum SelectionActionCatalog {
         return order.filter {
             isEnabled($0, enabledRaw: enabledRaw) && $0.appliesTo(text: text, isEditable: isEditable)
         }
+    }
+
+    /// A conservative "this looks like arithmetic" check: only digits, the
+    /// four basic operators, parentheses, decimal points and whitespace —
+    /// the same character set `ArithmeticEvaluator` is willing to parse.
+    static func looksLikeExpression(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 3, trimmed.contains(where: \.isNumber) else { return false }
+        let allowed = CharacterSet(charactersIn: "0123456789.+-*/()% ")
+        guard trimmed.unicodeScalars.allSatisfy(allowed.contains) else { return false }
+        return trimmed.contains(where: { "+-*/%".contains($0) })
+    }
+}
+
+/// The smallest meaningful list inside a selection: lines when there are
+/// line breaks, else space-separated words, else the individual characters
+/// of a single word — so "Reverse" on one word reverses its letters instead
+/// of doing nothing.
+enum TextListGranularity {
+    case lines([String])
+    case words([String])
+    case letters([Character])
+}
+
+enum TextListSupport {
+    static func granularity(of text: String) -> TextListGranularity {
+        if text.contains(where: \.isNewline) {
+            return .lines(text.components(separatedBy: .newlines))
+        }
+        let words = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        if words.count > 1 {
+            return .words(words)
+        }
+        return .letters(Array(text))
+    }
+
+    static func sorted(_ text: String) -> String {
+        switch granularity(of: text) {
+        case .lines(let items): return items.sorted().joined(separator: "\n")
+        case .words(let items): return items.sorted().joined(separator: " ")
+        case .letters(let items): return String(items.sorted())
+        }
+    }
+
+    static func reversed(_ text: String) -> String {
+        switch granularity(of: text) {
+        case .lines(let items): return items.reversed().joined(separator: "\n")
+        case .words(let items): return items.reversed().joined(separator: " ")
+        case .letters(let items): return String(items.reversed())
+        }
+    }
+
+    static func shuffled(_ text: String) -> String {
+        switch granularity(of: text) {
+        case .lines(let items): return items.shuffled().joined(separator: "\n")
+        case .words(let items): return items.shuffled().joined(separator: " ")
+        case .letters(let items): return String(items.shuffled())
+        }
+    }
+}
+
+/// A tiny, hand-rolled arithmetic evaluator (digits, `+ - * / %` and
+/// parentheses) — deliberately not `NSExpression`, whose format-string
+/// parser raises an uncaught `NSException` on malformed input (verified:
+/// `NSExpression(format: "3++4")` crashes the process; Swift cannot catch an
+/// Objective-C exception). Malformed input here just returns nil.
+enum ArithmeticEvaluator {
+    static func evaluate(_ text: String) -> Double? {
+        let chars = Array(text.filter { !$0.isWhitespace })
+        var index = 0
+
+        func peek() -> Character? { index < chars.count ? chars[index] : nil }
+
+        func parseNumber() -> Double? {
+            var digits = ""
+            while let c = peek(), c.isNumber || c == "." {
+                digits.append(c)
+                index += 1
+            }
+            return digits.isEmpty ? nil : Double(digits)
+        }
+
+        func parseFactor() -> Double? {
+            if peek() == "-" {
+                index += 1
+                guard let value = parseFactor() else { return nil }
+                return -value
+            }
+            if peek() == "+" {
+                index += 1
+                return parseFactor()
+            }
+            if peek() == "(" {
+                index += 1
+                guard let value = parseExpression() else { return nil }
+                guard peek() == ")" else { return nil }
+                index += 1
+                return value
+            }
+            return parseNumber()
+        }
+
+        func parseTerm() -> Double? {
+            guard var value = parseFactor() else { return nil }
+            while let op = peek(), op == "*" || op == "/" || op == "%" {
+                index += 1
+                guard let rhs = parseFactor() else { return nil }
+                switch op {
+                case "*": value *= rhs
+                case "/":
+                    guard rhs != 0 else { return nil }
+                    value /= rhs
+                default:
+                    guard rhs != 0 else { return nil }
+                    value = value.truncatingRemainder(dividingBy: rhs)
+                }
+            }
+            return value
+        }
+
+        func parseExpression() -> Double? {
+            guard var value = parseTerm() else { return nil }
+            while let op = peek(), op == "+" || op == "-" {
+                index += 1
+                guard let rhs = parseTerm() else { return nil }
+                value = op == "+" ? value + rhs : value - rhs
+            }
+            return value
+        }
+
+        guard let result = parseExpression(), index == chars.count, result.isFinite else { return nil }
+        return result
     }
 }

@@ -34,11 +34,49 @@ struct SelectionActionsStrings {
     let cutTitle: String
     let pasteTitle: String
     let deleteTitle: String
+    let pastePlainTitle: String
+    let uppercaseTitle: String
+    let lowercaseTitle: String
+    let capitalizeTitle: String
+    let removeSpacesTitle: String
+    let underscoreTitle: String
+    let joinLinesTitle: String
+    let commaListTitle: String
+    let sortTitle: String
+    let reverseTitle: String
+    let randomTitle: String
+    let quotesTitle: String
+    let bracketsTitle: String
+    let urlEncodeTitle: String
+    let urlDecodeTitle: String
+    let base64EncodeTitle: String
+    let base64DecodeTitle: String
+    let calculateTitle: String
+    let addToScratchpadTitle: String
 
     let copyDescription: String
     let cutDescription: String
     let pasteDescription: String
     let deleteDescription: String
+    let pastePlainDescription: String
+    let uppercaseDescription: String
+    let lowercaseDescription: String
+    let capitalizeDescription: String
+    let removeSpacesDescription: String
+    let underscoreDescription: String
+    let joinLinesDescription: String
+    let commaListDescription: String
+    let sortDescription: String
+    let reverseDescription: String
+    let randomDescription: String
+    let quotesDescription: String
+    let bracketsDescription: String
+    let urlEncodeDescription: String
+    let urlDecodeDescription: String
+    let base64EncodeDescription: String
+    let base64DecodeDescription: String
+    let calculateDescription: String
+    let addToScratchpadDescription: String
 
     func title(for action: SelectionAction) -> String {
         switch action {
@@ -46,6 +84,25 @@ struct SelectionActionsStrings {
         case .cut: return cutTitle
         case .paste: return pasteTitle
         case .delete: return deleteTitle
+        case .pastePlain: return pastePlainTitle
+        case .uppercase: return uppercaseTitle
+        case .lowercase: return lowercaseTitle
+        case .capitalize: return capitalizeTitle
+        case .removeSpaces: return removeSpacesTitle
+        case .underscore: return underscoreTitle
+        case .joinLines: return joinLinesTitle
+        case .commaList: return commaListTitle
+        case .sort: return sortTitle
+        case .reverse: return reverseTitle
+        case .random: return randomTitle
+        case .quotes: return quotesTitle
+        case .brackets: return bracketsTitle
+        case .urlEncode: return urlEncodeTitle
+        case .urlDecode: return urlDecodeTitle
+        case .base64Encode: return base64EncodeTitle
+        case .base64Decode: return base64DecodeTitle
+        case .calculate: return calculateTitle
+        case .addToScratchpad: return addToScratchpadTitle
         }
     }
 
@@ -55,6 +112,25 @@ struct SelectionActionsStrings {
         case .cut: return cutDescription
         case .paste: return pasteDescription
         case .delete: return deleteDescription
+        case .pastePlain: return pastePlainDescription
+        case .uppercase: return uppercaseDescription
+        case .lowercase: return lowercaseDescription
+        case .capitalize: return capitalizeDescription
+        case .removeSpaces: return removeSpacesDescription
+        case .underscore: return underscoreDescription
+        case .joinLines: return joinLinesDescription
+        case .commaList: return commaListDescription
+        case .sort: return sortDescription
+        case .reverse: return reverseDescription
+        case .random: return randomDescription
+        case .quotes: return quotesDescription
+        case .brackets: return bracketsDescription
+        case .urlEncode: return urlEncodeDescription
+        case .urlDecode: return urlDecodeDescription
+        case .base64Encode: return base64EncodeDescription
+        case .base64Decode: return base64DecodeDescription
+        case .calculate: return calculateDescription
+        case .addToScratchpad: return addToScratchpadDescription
         }
     }
 }
@@ -109,10 +185,48 @@ extension SelectionActionsStrings {
         cutTitle: "Cut",
         pasteTitle: "Paste",
         deleteTitle: "Delete",
+        pastePlainTitle: "Paste as Plain Text",
+        uppercaseTitle: "UPPERCASE",
+        lowercaseTitle: "lowercase",
+        capitalizeTitle: "Capitalize",
+        removeSpacesTitle: "Remove Spaces",
+        underscoreTitle: "Underscore",
+        joinLinesTitle: "Join Lines",
+        commaListTitle: "Comma List",
+        sortTitle: "Sort",
+        reverseTitle: "Reverse",
+        randomTitle: "Random",
+        quotesTitle: "Quotes",
+        bracketsTitle: "Brackets",
+        urlEncodeTitle: "URL Encode",
+        urlDecodeTitle: "URL Decode",
+        base64EncodeTitle: "Base64 Encode",
+        base64DecodeTitle: "Base64 Decode",
+        calculateTitle: "Calculate",
+        addToScratchpadTitle: "Add to Scratchpad",
         copyDescription: "Copies the selection to the clipboard.",
         cutDescription: "Copies the selection, then removes it.",
         pasteDescription: "Replaces the selection with what's on the clipboard.",
-        deleteDescription: "Removes the selection without copying it."
+        deleteDescription: "Removes the selection without copying it.",
+        pastePlainDescription: "Same, but strips fonts, colors and links first.",
+        uppercaseDescription: "Converts the selection to uppercase.",
+        lowercaseDescription: "Converts the selection to lowercase.",
+        capitalizeDescription: "Capitalizes each word in the selection.",
+        removeSpacesDescription: "Removes every space in the selection.",
+        underscoreDescription: "Replaces spaces with underscores.",
+        joinLinesDescription: "Joins multiple lines into one.",
+        commaListDescription: "Joins lines or words into a comma-separated list.",
+        sortDescription: "Sorts lines, words, or letters alphabetically.",
+        reverseDescription: "Reverses the order of lines, words, or letters.",
+        randomDescription: "Shuffles lines, words, or letters.",
+        quotesDescription: "Wraps the selection in quotation marks.",
+        bracketsDescription: "Wraps the selection in parentheses.",
+        urlEncodeDescription: "Percent-encodes the selection for a URL.",
+        urlDecodeDescription: "Removes percent-encoding from the selection.",
+        base64EncodeDescription: "Encodes the selection as Base64.",
+        base64DecodeDescription: "Decodes the selection from Base64.",
+        calculateDescription: "Evaluates the selection as a math expression.",
+        addToScratchpadDescription: "Adds the selection to the Scratchpad."
     )
 
     static let ptBR = SelectionActionsStrings(
@@ -144,10 +258,48 @@ extension SelectionActionsStrings {
         cutTitle: "Recortar",
         pasteTitle: "Colar",
         deleteTitle: "Excluir",
+        pastePlainTitle: "Colar como Texto Simples",
+        uppercaseTitle: "MAIÚSCULAS",
+        lowercaseTitle: "minúsculas",
+        capitalizeTitle: "Capitalizar",
+        removeSpacesTitle: "Remover Espaços",
+        underscoreTitle: "Sublinhado",
+        joinLinesTitle: "Unir Linhas",
+        commaListTitle: "Lista com Vírgulas",
+        sortTitle: "Ordenar",
+        reverseTitle: "Inverter",
+        randomTitle: "Aleatório",
+        quotesTitle: "Aspas",
+        bracketsTitle: "Parênteses",
+        urlEncodeTitle: "Codificar URL",
+        urlDecodeTitle: "Decodificar URL",
+        base64EncodeTitle: "Codificar Base64",
+        base64DecodeTitle: "Decodificar Base64",
+        calculateTitle: "Calcular",
+        addToScratchpadTitle: "Adicionar ao Bloco de Notas",
         copyDescription: "Copia a seleção para a área de transferência.",
         cutDescription: "Copia a seleção e a remove em seguida.",
         pasteDescription: "Substitui a seleção pelo conteúdo da área de transferência.",
-        deleteDescription: "Remove a seleção sem copiá-la."
+        deleteDescription: "Remove a seleção sem copiá-la.",
+        pastePlainDescription: "O mesmo, mas removendo fontes, cores e links antes.",
+        uppercaseDescription: "Converte a seleção para maiúsculas.",
+        lowercaseDescription: "Converte a seleção para minúsculas.",
+        capitalizeDescription: "Coloca em maiúscula a inicial de cada palavra da seleção.",
+        removeSpacesDescription: "Remove todos os espaços da seleção.",
+        underscoreDescription: "Substitui espaços por sublinhados.",
+        joinLinesDescription: "Une várias linhas em uma só.",
+        commaListDescription: "Une linhas ou palavras em uma lista separada por vírgulas.",
+        sortDescription: "Ordena linhas, palavras ou letras alfabeticamente.",
+        reverseDescription: "Inverte a ordem de linhas, palavras ou letras.",
+        randomDescription: "Embaralha linhas, palavras ou letras.",
+        quotesDescription: "Coloca a seleção entre aspas.",
+        bracketsDescription: "Coloca a seleção entre parênteses.",
+        urlEncodeDescription: "Codifica a seleção em percent-encoding para uma URL.",
+        urlDecodeDescription: "Remove a codificação percent-encoding da seleção.",
+        base64EncodeDescription: "Codifica a seleção em Base64.",
+        base64DecodeDescription: "Decodifica a seleção de Base64.",
+        calculateDescription: "Avalia a seleção como uma expressão matemática.",
+        addToScratchpadDescription: "Adiciona a seleção ao Bloco de Notas."
     )
 
     static let tr = SelectionActionsStrings(
@@ -179,10 +331,48 @@ extension SelectionActionsStrings {
         cutTitle: "Kes",
         pasteTitle: "Yapıştır",
         deleteTitle: "Sil",
+        pastePlainTitle: "Düz Metin Olarak Yapıştır",
+        uppercaseTitle: "BÜYÜK HARF",
+        lowercaseTitle: "küçük harf",
+        capitalizeTitle: "Baş Harfleri Büyüt",
+        removeSpacesTitle: "Boşlukları Kaldır",
+        underscoreTitle: "Alt Çizgi",
+        joinLinesTitle: "Satırları Birleştir",
+        commaListTitle: "Virgüllü Liste",
+        sortTitle: "Sırala",
+        reverseTitle: "Ters Çevir",
+        randomTitle: "Rastgele",
+        quotesTitle: "Tırnak İşareti",
+        bracketsTitle: "Parantez",
+        urlEncodeTitle: "URL Kodla",
+        urlDecodeTitle: "URL Kodunu Çöz",
+        base64EncodeTitle: "Base64 Kodla",
+        base64DecodeTitle: "Base64 Kodunu Çöz",
+        calculateTitle: "Hesapla",
+        addToScratchpadTitle: "Not Defterine Ekle",
         copyDescription: "Seçimi panoya kopyalar.",
         cutDescription: "Seçimi kopyalar, sonra kaldırır.",
         pasteDescription: "Seçimi panodaki içerikle değiştirir.",
-        deleteDescription: "Seçimi kopyalamadan kaldırır."
+        deleteDescription: "Seçimi kopyalamadan kaldırır.",
+        pastePlainDescription: "Aynısı, ancak önce yazı tiplerini, renkleri ve bağlantıları kaldırır.",
+        uppercaseDescription: "Seçimi büyük harfe çevirir.",
+        lowercaseDescription: "Seçimi küçük harfe çevirir.",
+        capitalizeDescription: "Seçimdeki her kelimenin baş harfini büyütür.",
+        removeSpacesDescription: "Seçimdeki tüm boşlukları kaldırır.",
+        underscoreDescription: "Boşlukları alt çizgiyle değiştirir.",
+        joinLinesDescription: "Birden fazla satırı tek satırda birleştirir.",
+        commaListDescription: "Satırları veya kelimeleri virgülle ayrılmış bir listede birleştirir.",
+        sortDescription: "Satırları, kelimeleri veya harfleri alfabetik sıralar.",
+        reverseDescription: "Satırların, kelimelerin veya harflerin sırasını ters çevirir.",
+        randomDescription: "Satırları, kelimeleri veya harfleri karıştırır.",
+        quotesDescription: "Seçimi tırnak işareti içine alır.",
+        bracketsDescription: "Seçimi parantez içine alır.",
+        urlEncodeDescription: "Seçimi bir URL için yüzde kodlamasıyla kodlar.",
+        urlDecodeDescription: "Seçimden yüzde kodlamasını kaldırır.",
+        base64EncodeDescription: "Seçimi Base64 olarak kodlar.",
+        base64DecodeDescription: "Seçimi Base64'ten çözer.",
+        calculateDescription: "Seçimi bir matematik ifadesi olarak hesaplar.",
+        addToScratchpadDescription: "Seçimi Not Defterine ekler."
     )
 
     static let ru = SelectionActionsStrings(
@@ -214,10 +404,48 @@ extension SelectionActionsStrings {
         cutTitle: "Вырезать",
         pasteTitle: "Вставить",
         deleteTitle: "Удалить",
+        pastePlainTitle: "Вставить как обычный текст",
+        uppercaseTitle: "ВЕРХНИЙ РЕГИСТР",
+        lowercaseTitle: "нижний регистр",
+        capitalizeTitle: "Заглавные буквы",
+        removeSpacesTitle: "Удалить пробелы",
+        underscoreTitle: "Подчёркивание",
+        joinLinesTitle: "Объединить строки",
+        commaListTitle: "Список через запятую",
+        sortTitle: "Сортировать",
+        reverseTitle: "Развернуть",
+        randomTitle: "Случайно",
+        quotesTitle: "Кавычки",
+        bracketsTitle: "Скобки",
+        urlEncodeTitle: "URL-кодирование",
+        urlDecodeTitle: "URL-декодирование",
+        base64EncodeTitle: "Кодировать Base64",
+        base64DecodeTitle: "Декодировать Base64",
+        calculateTitle: "Вычислить",
+        addToScratchpadTitle: "Добавить в Блокнот",
         copyDescription: "Копирует выделение в буфер обмена.",
         cutDescription: "Копирует выделение, затем удаляет его.",
         pasteDescription: "Заменяет выделение содержимым буфера обмена.",
-        deleteDescription: "Удаляет выделение без копирования."
+        deleteDescription: "Удаляет выделение без копирования.",
+        pastePlainDescription: "То же самое, но сначала убирает шрифты, цвета и ссылки.",
+        uppercaseDescription: "Переводит выделение в верхний регистр.",
+        lowercaseDescription: "Переводит выделение в нижний регистр.",
+        capitalizeDescription: "Делает заглавной первую букву каждого слова в выделении.",
+        removeSpacesDescription: "Удаляет все пробелы в выделении.",
+        underscoreDescription: "Заменяет пробелы символами подчёркивания.",
+        joinLinesDescription: "Объединяет несколько строк в одну.",
+        commaListDescription: "Объединяет строки или слова в список через запятую.",
+        sortDescription: "Сортирует строки, слова или буквы по алфавиту.",
+        reverseDescription: "Меняет порядок строк, слов или букв на обратный.",
+        randomDescription: "Перемешивает строки, слова или буквы.",
+        quotesDescription: "Заключает выделение в кавычки.",
+        bracketsDescription: "Заключает выделение в скобки.",
+        urlEncodeDescription: "Кодирует выделение для URL (percent-encoding).",
+        urlDecodeDescription: "Убирает percent-encoding из выделения.",
+        base64EncodeDescription: "Кодирует выделение в Base64.",
+        base64DecodeDescription: "Декодирует выделение из Base64.",
+        calculateDescription: "Вычисляет выделение как математическое выражение.",
+        addToScratchpadDescription: "Добавляет выделение в Блокнот."
     )
 
     static let es = SelectionActionsStrings(
@@ -249,10 +477,48 @@ extension SelectionActionsStrings {
         cutTitle: "Cortar",
         pasteTitle: "Pegar",
         deleteTitle: "Eliminar",
+        pastePlainTitle: "Pegar como Texto Sin Formato",
+        uppercaseTitle: "MAYÚSCULAS",
+        lowercaseTitle: "minúsculas",
+        capitalizeTitle: "Capitalizar",
+        removeSpacesTitle: "Quitar Espacios",
+        underscoreTitle: "Guion Bajo",
+        joinLinesTitle: "Unir Líneas",
+        commaListTitle: "Lista con Comas",
+        sortTitle: "Ordenar",
+        reverseTitle: "Invertir",
+        randomTitle: "Aleatorio",
+        quotesTitle: "Comillas",
+        bracketsTitle: "Paréntesis",
+        urlEncodeTitle: "Codificar URL",
+        urlDecodeTitle: "Decodificar URL",
+        base64EncodeTitle: "Codificar Base64",
+        base64DecodeTitle: "Decodificar Base64",
+        calculateTitle: "Calcular",
+        addToScratchpadTitle: "Añadir al Bloc de Notas",
         copyDescription: "Copia la selección al portapapeles.",
         cutDescription: "Copia la selección y luego la elimina.",
         pasteDescription: "Reemplaza la selección con el contenido del portapapeles.",
-        deleteDescription: "Elimina la selección sin copiarla."
+        deleteDescription: "Elimina la selección sin copiarla.",
+        pastePlainDescription: "Lo mismo, pero eliminando antes fuentes, colores y enlaces.",
+        uppercaseDescription: "Convierte la selección a mayúsculas.",
+        lowercaseDescription: "Convierte la selección a minúsculas.",
+        capitalizeDescription: "Pone en mayúscula la inicial de cada palabra de la selección.",
+        removeSpacesDescription: "Elimina todos los espacios de la selección.",
+        underscoreDescription: "Reemplaza los espacios por guiones bajos.",
+        joinLinesDescription: "Une varias líneas en una sola.",
+        commaListDescription: "Une líneas o palabras en una lista separada por comas.",
+        sortDescription: "Ordena líneas, palabras o letras alfabéticamente.",
+        reverseDescription: "Invierte el orden de líneas, palabras o letras.",
+        randomDescription: "Mezcla líneas, palabras o letras.",
+        quotesDescription: "Envuelve la selección entre comillas.",
+        bracketsDescription: "Envuelve la selección entre paréntesis.",
+        urlEncodeDescription: "Codifica la selección con percent-encoding para una URL.",
+        urlDecodeDescription: "Quita el percent-encoding de la selección.",
+        base64EncodeDescription: "Codifica la selección en Base64.",
+        base64DecodeDescription: "Decodifica la selección desde Base64.",
+        calculateDescription: "Evalúa la selección como una expresión matemática.",
+        addToScratchpadDescription: "Añade la selección al Bloc de Notas."
     )
 
     static let de = SelectionActionsStrings(
@@ -284,10 +550,48 @@ extension SelectionActionsStrings {
         cutTitle: "Ausschneiden",
         pasteTitle: "Einfügen",
         deleteTitle: "Löschen",
+        pastePlainTitle: "Als reinen Text einfügen",
+        uppercaseTitle: "GROSSBUCHSTABEN",
+        lowercaseTitle: "kleinbuchstaben",
+        capitalizeTitle: "Großschreiben",
+        removeSpacesTitle: "Leerzeichen entfernen",
+        underscoreTitle: "Unterstrich",
+        joinLinesTitle: "Zeilen zusammenführen",
+        commaListTitle: "Kommaliste",
+        sortTitle: "Sortieren",
+        reverseTitle: "Umkehren",
+        randomTitle: "Zufällig",
+        quotesTitle: "Anführungszeichen",
+        bracketsTitle: "Klammern",
+        urlEncodeTitle: "URL kodieren",
+        urlDecodeTitle: "URL dekodieren",
+        base64EncodeTitle: "Base64 kodieren",
+        base64DecodeTitle: "Base64 dekodieren",
+        calculateTitle: "Berechnen",
+        addToScratchpadTitle: "Zum Notizblock hinzufügen",
         copyDescription: "Kopiert die Auswahl in die Zwischenablage.",
         cutDescription: "Kopiert die Auswahl und entfernt sie dann.",
         pasteDescription: "Ersetzt die Auswahl durch den Inhalt der Zwischenablage.",
-        deleteDescription: "Entfernt die Auswahl, ohne sie zu kopieren."
+        deleteDescription: "Entfernt die Auswahl, ohne sie zu kopieren.",
+        pastePlainDescription: "Dasselbe, entfernt aber zuerst Schriften, Farben und Links.",
+        uppercaseDescription: "Wandelt die Auswahl in Großbuchstaben um.",
+        lowercaseDescription: "Wandelt die Auswahl in Kleinbuchstaben um.",
+        capitalizeDescription: "Schreibt jedes Wort der Auswahl groß.",
+        removeSpacesDescription: "Entfernt alle Leerzeichen in der Auswahl.",
+        underscoreDescription: "Ersetzt Leerzeichen durch Unterstriche.",
+        joinLinesDescription: "Führt mehrere Zeilen zu einer zusammen.",
+        commaListDescription: "Fügt Zeilen oder Wörter zu einer kommagetrennten Liste zusammen.",
+        sortDescription: "Sortiert Zeilen, Wörter oder Buchstaben alphabetisch.",
+        reverseDescription: "Kehrt die Reihenfolge von Zeilen, Wörtern oder Buchstaben um.",
+        randomDescription: "Mischt Zeilen, Wörter oder Buchstaben.",
+        quotesDescription: "Setzt die Auswahl in Anführungszeichen.",
+        bracketsDescription: "Setzt die Auswahl in Klammern.",
+        urlEncodeDescription: "Kodiert die Auswahl per Prozent-Kodierung für eine URL.",
+        urlDecodeDescription: "Entfernt die Prozent-Kodierung aus der Auswahl.",
+        base64EncodeDescription: "Kodiert die Auswahl als Base64.",
+        base64DecodeDescription: "Dekodiert die Auswahl aus Base64.",
+        calculateDescription: "Wertet die Auswahl als mathematischen Ausdruck aus.",
+        addToScratchpadDescription: "Fügt die Auswahl dem Notizblock hinzu."
     )
 
     static let fr = SelectionActionsStrings(
@@ -319,10 +623,48 @@ extension SelectionActionsStrings {
         cutTitle: "Couper",
         pasteTitle: "Coller",
         deleteTitle: "Supprimer",
+        pastePlainTitle: "Coller sans mise en forme",
+        uppercaseTitle: "MAJUSCULES",
+        lowercaseTitle: "minuscules",
+        capitalizeTitle: "Mettre en majuscules",
+        removeSpacesTitle: "Supprimer les espaces",
+        underscoreTitle: "Tiret bas",
+        joinLinesTitle: "Joindre les lignes",
+        commaListTitle: "Liste avec virgules",
+        sortTitle: "Trier",
+        reverseTitle: "Inverser",
+        randomTitle: "Aléatoire",
+        quotesTitle: "Guillemets",
+        bracketsTitle: "Parenthèses",
+        urlEncodeTitle: "Encoder l'URL",
+        urlDecodeTitle: "Décoder l'URL",
+        base64EncodeTitle: "Encoder en Base64",
+        base64DecodeTitle: "Décoder le Base64",
+        calculateTitle: "Calculer",
+        addToScratchpadTitle: "Ajouter au Bloc-notes",
         copyDescription: "Copie la sélection dans le presse-papiers.",
         cutDescription: "Copie la sélection, puis la supprime.",
         pasteDescription: "Remplace la sélection par le contenu du presse-papiers.",
-        deleteDescription: "Supprime la sélection sans la copier."
+        deleteDescription: "Supprime la sélection sans la copier.",
+        pastePlainDescription: "Pareil, mais retire d'abord les polices, couleurs et liens.",
+        uppercaseDescription: "Convertit la sélection en majuscules.",
+        lowercaseDescription: "Convertit la sélection en minuscules.",
+        capitalizeDescription: "Met en majuscule l'initiale de chaque mot de la sélection.",
+        removeSpacesDescription: "Supprime tous les espaces de la sélection.",
+        underscoreDescription: "Remplace les espaces par des tirets bas.",
+        joinLinesDescription: "Réunit plusieurs lignes en une seule.",
+        commaListDescription: "Réunit des lignes ou des mots en une liste séparée par des virgules.",
+        sortDescription: "Trie les lignes, mots ou lettres par ordre alphabétique.",
+        reverseDescription: "Inverse l'ordre des lignes, mots ou lettres.",
+        randomDescription: "Mélange les lignes, mots ou lettres.",
+        quotesDescription: "Encadre la sélection de guillemets.",
+        bracketsDescription: "Encadre la sélection de parenthèses.",
+        urlEncodeDescription: "Encode la sélection en percent-encoding pour une URL.",
+        urlDecodeDescription: "Retire le percent-encoding de la sélection.",
+        base64EncodeDescription: "Encode la sélection en Base64.",
+        base64DecodeDescription: "Décode la sélection depuis Base64.",
+        calculateDescription: "Évalue la sélection comme une expression mathématique.",
+        addToScratchpadDescription: "Ajoute la sélection au Bloc-notes."
     )
 
     static let it = SelectionActionsStrings(
@@ -354,10 +696,48 @@ extension SelectionActionsStrings {
         cutTitle: "Taglia",
         pasteTitle: "Incolla",
         deleteTitle: "Elimina",
+        pastePlainTitle: "Incolla come Testo Semplice",
+        uppercaseTitle: "MAIUSCOLO",
+        lowercaseTitle: "minuscolo",
+        capitalizeTitle: "Iniziali Maiuscole",
+        removeSpacesTitle: "Rimuovi Spazi",
+        underscoreTitle: "Trattino Basso",
+        joinLinesTitle: "Unisci Righe",
+        commaListTitle: "Elenco con Virgole",
+        sortTitle: "Ordina",
+        reverseTitle: "Inverti",
+        randomTitle: "Casuale",
+        quotesTitle: "Virgolette",
+        bracketsTitle: "Parentesi",
+        urlEncodeTitle: "Codifica URL",
+        urlDecodeTitle: "Decodifica URL",
+        base64EncodeTitle: "Codifica Base64",
+        base64DecodeTitle: "Decodifica Base64",
+        calculateTitle: "Calcola",
+        addToScratchpadTitle: "Aggiungi al Blocco Note",
         copyDescription: "Copia la selezione negli appunti.",
         cutDescription: "Copia la selezione, poi la rimuove.",
         pasteDescription: "Sostituisce la selezione con il contenuto degli appunti.",
-        deleteDescription: "Rimuove la selezione senza copiarla."
+        deleteDescription: "Rimuove la selezione senza copiarla.",
+        pastePlainDescription: "Lo stesso, ma rimuove prima font, colori e link.",
+        uppercaseDescription: "Converte la selezione in maiuscolo.",
+        lowercaseDescription: "Converte la selezione in minuscolo.",
+        capitalizeDescription: "Rende maiuscola l'iniziale di ogni parola della selezione.",
+        removeSpacesDescription: "Rimuove tutti gli spazi dalla selezione.",
+        underscoreDescription: "Sostituisce gli spazi con trattini bassi.",
+        joinLinesDescription: "Unisce più righe in una sola.",
+        commaListDescription: "Unisce righe o parole in un elenco separato da virgole.",
+        sortDescription: "Ordina righe, parole o lettere in ordine alfabetico.",
+        reverseDescription: "Inverte l'ordine di righe, parole o lettere.",
+        randomDescription: "Mescola righe, parole o lettere.",
+        quotesDescription: "Racchiude la selezione tra virgolette.",
+        bracketsDescription: "Racchiude la selezione tra parentesi.",
+        urlEncodeDescription: "Codifica la selezione con percent-encoding per un URL.",
+        urlDecodeDescription: "Rimuove il percent-encoding dalla selezione.",
+        base64EncodeDescription: "Codifica la selezione in Base64.",
+        base64DecodeDescription: "Decodifica la selezione da Base64.",
+        calculateDescription: "Valuta la selezione come espressione matematica.",
+        addToScratchpadDescription: "Aggiunge la selezione al Blocco Note."
     )
 
     static let ja = SelectionActionsStrings(
@@ -389,10 +769,48 @@ extension SelectionActionsStrings {
         cutTitle: "カット",
         pasteTitle: "ペースト",
         deleteTitle: "削除",
+        pastePlainTitle: "プレーンテキストとしてペースト",
+        uppercaseTitle: "大文字",
+        lowercaseTitle: "小文字",
+        capitalizeTitle: "先頭を大文字に",
+        removeSpacesTitle: "余分な空白を削除",
+        underscoreTitle: "アンダースコア",
+        joinLinesTitle: "行を結合",
+        commaListTitle: "カンマ区切りリスト",
+        sortTitle: "並べ替え",
+        reverseTitle: "反転",
+        randomTitle: "ランダム",
+        quotesTitle: "引用符",
+        bracketsTitle: "括弧",
+        urlEncodeTitle: "URLエンコード",
+        urlDecodeTitle: "URLデコード",
+        base64EncodeTitle: "Base64エンコード",
+        base64DecodeTitle: "Base64デコード",
+        calculateTitle: "計算",
+        addToScratchpadTitle: "メモ帳に追加",
         copyDescription: "選択範囲をクリップボードにコピーします。",
         cutDescription: "選択範囲をコピーしてから削除します。",
         pasteDescription: "選択範囲をクリップボードの内容で置き換えます。",
-        deleteDescription: "選択範囲をコピーせずに削除します。"
+        deleteDescription: "選択範囲をコピーせずに削除します。",
+        pastePlainDescription: "同様の動作ですが、先にフォント・色・リンクを取り除きます。",
+        uppercaseDescription: "選択範囲を大文字に変換します。",
+        lowercaseDescription: "選択範囲を小文字に変換します。",
+        capitalizeDescription: "選択範囲の各単語の先頭を大文字にします。",
+        removeSpacesDescription: "選択範囲のすべての空白を削除します。",
+        underscoreDescription: "空白をアンダースコアに置き換えます。",
+        joinLinesDescription: "複数行を1行に結合します。",
+        commaListDescription: "行または単語をカンマ区切りのリストに結合します。",
+        sortDescription: "行・単語・文字をアルファベット順に並べ替えます。",
+        reverseDescription: "行・単語・文字の順序を反転します。",
+        randomDescription: "行・単語・文字をシャッフルします。",
+        quotesDescription: "選択範囲を引用符で囲みます。",
+        bracketsDescription: "選択範囲を括弧で囲みます。",
+        urlEncodeDescription: "選択範囲をURL用にパーセントエンコードします。",
+        urlDecodeDescription: "選択範囲のパーセントエンコードを解除します。",
+        base64EncodeDescription: "選択範囲をBase64にエンコードします。",
+        base64DecodeDescription: "選択範囲をBase64からデコードします。",
+        calculateDescription: "選択範囲を数式として計算します。",
+        addToScratchpadDescription: "選択範囲をメモ帳に追加します。"
     )
 
     static let ko = SelectionActionsStrings(
@@ -424,10 +842,48 @@ extension SelectionActionsStrings {
         cutTitle: "잘라내기",
         pasteTitle: "붙여넣기",
         deleteTitle: "삭제",
+        pastePlainTitle: "일반 텍스트로 붙여넣기",
+        uppercaseTitle: "대문자",
+        lowercaseTitle: "소문자",
+        capitalizeTitle: "첫 글자 대문자",
+        removeSpacesTitle: "공백 제거",
+        underscoreTitle: "밑줄",
+        joinLinesTitle: "줄 합치기",
+        commaListTitle: "쉼표 목록",
+        sortTitle: "정렬",
+        reverseTitle: "반전",
+        randomTitle: "무작위",
+        quotesTitle: "따옴표",
+        bracketsTitle: "괄호",
+        urlEncodeTitle: "URL 인코딩",
+        urlDecodeTitle: "URL 디코딩",
+        base64EncodeTitle: "Base64 인코딩",
+        base64DecodeTitle: "Base64 디코딩",
+        calculateTitle: "계산",
+        addToScratchpadTitle: "메모장에 추가",
         copyDescription: "선택 항목을 클립보드에 복사합니다.",
         cutDescription: "선택 항목을 복사한 후 제거합니다.",
         pasteDescription: "선택 항목을 클립보드 내용으로 바꿉니다.",
-        deleteDescription: "선택 항목을 복사하지 않고 제거합니다."
+        deleteDescription: "선택 항목을 복사하지 않고 제거합니다.",
+        pastePlainDescription: "동일하지만 글꼴, 색상, 링크를 먼저 제거합니다.",
+        uppercaseDescription: "선택 항목을 대문자로 변환합니다.",
+        lowercaseDescription: "선택 항목을 소문자로 변환합니다.",
+        capitalizeDescription: "선택 항목의 각 단어 첫 글자를 대문자로 만듭니다.",
+        removeSpacesDescription: "선택 항목의 모든 공백을 제거합니다.",
+        underscoreDescription: "공백을 밑줄로 바꿉니다.",
+        joinLinesDescription: "여러 줄을 한 줄로 합칩니다.",
+        commaListDescription: "줄 또는 단어를 쉼표로 구분된 목록으로 합칩니다.",
+        sortDescription: "줄, 단어 또는 글자를 알파벳순으로 정렬합니다.",
+        reverseDescription: "줄, 단어 또는 글자의 순서를 반전합니다.",
+        randomDescription: "줄, 단어 또는 글자를 무작위로 섞습니다.",
+        quotesDescription: "선택 항목을 따옴표로 감쌉니다.",
+        bracketsDescription: "선택 항목을 괄호로 감쌉니다.",
+        urlEncodeDescription: "URL용으로 선택 항목을 퍼센트 인코딩합니다.",
+        urlDecodeDescription: "선택 항목의 퍼센트 인코딩을 제거합니다.",
+        base64EncodeDescription: "선택 항목을 Base64로 인코딩합니다.",
+        base64DecodeDescription: "선택 항목을 Base64에서 디코딩합니다.",
+        calculateDescription: "선택 항목을 수식으로 계산합니다.",
+        addToScratchpadDescription: "선택 항목을 메모장에 추가합니다."
     )
 
     static let zhHans = SelectionActionsStrings(
@@ -459,10 +915,48 @@ extension SelectionActionsStrings {
         cutTitle: "剪切",
         pasteTitle: "粘贴",
         deleteTitle: "删除",
+        pastePlainTitle: "粘贴为纯文本",
+        uppercaseTitle: "大写",
+        lowercaseTitle: "小写",
+        capitalizeTitle: "首字母大写",
+        removeSpacesTitle: "移除多余空格",
+        underscoreTitle: "下划线",
+        joinLinesTitle: "合并行",
+        commaListTitle: "逗号列表",
+        sortTitle: "排序",
+        reverseTitle: "反转",
+        randomTitle: "随机",
+        quotesTitle: "引号",
+        bracketsTitle: "括号",
+        urlEncodeTitle: "URL 编码",
+        urlDecodeTitle: "URL 解码",
+        base64EncodeTitle: "Base64 编码",
+        base64DecodeTitle: "Base64 解码",
+        calculateTitle: "计算",
+        addToScratchpadTitle: "添加到便签",
         copyDescription: "将所选内容复制到剪贴板。",
         cutDescription: "先复制所选内容，再将其移除。",
         pasteDescription: "用剪贴板内容替换所选内容。",
-        deleteDescription: "移除所选内容但不复制。"
+        deleteDescription: "移除所选内容但不复制。",
+        pastePlainDescription: "效果相同，但会先去除字体、颜色和链接。",
+        uppercaseDescription: "将所选内容转换为大写。",
+        lowercaseDescription: "将所选内容转换为小写。",
+        capitalizeDescription: "将所选内容中每个单词的首字母大写。",
+        removeSpacesDescription: "移除所选内容中的所有空格。",
+        underscoreDescription: "用下划线替换空格。",
+        joinLinesDescription: "将多行合并为一行。",
+        commaListDescription: "将各行或各词合并为逗号分隔的列表。",
+        sortDescription: "按字母顺序对行、词或字母排序。",
+        reverseDescription: "反转行、词或字母的顺序。",
+        randomDescription: "打乱行、词或字母的顺序。",
+        quotesDescription: "用引号将所选内容括起来。",
+        bracketsDescription: "用括号将所选内容括起来。",
+        urlEncodeDescription: "为 URL 对所选内容进行百分号编码。",
+        urlDecodeDescription: "移除所选内容中的百分号编码。",
+        base64EncodeDescription: "将所选内容编码为 Base64。",
+        base64DecodeDescription: "将所选内容从 Base64 解码。",
+        calculateDescription: "将所选内容作为数学表达式计算。",
+        addToScratchpadDescription: "将所选内容添加到便签。"
     )
 
     static let zhTW = SelectionActionsStrings(
@@ -494,10 +988,48 @@ extension SelectionActionsStrings {
         cutTitle: "剪下",
         pasteTitle: "貼上",
         deleteTitle: "刪除",
+        pastePlainTitle: "貼上為純文字",
+        uppercaseTitle: "大寫",
+        lowercaseTitle: "小寫",
+        capitalizeTitle: "首字母大寫",
+        removeSpacesTitle: "移除多餘空格",
+        underscoreTitle: "底線",
+        joinLinesTitle: "合併行",
+        commaListTitle: "逗號清單",
+        sortTitle: "排序",
+        reverseTitle: "反轉",
+        randomTitle: "隨機",
+        quotesTitle: "引號",
+        bracketsTitle: "括號",
+        urlEncodeTitle: "URL 編碼",
+        urlDecodeTitle: "URL 解碼",
+        base64EncodeTitle: "Base64 編碼",
+        base64DecodeTitle: "Base64 解碼",
+        calculateTitle: "計算",
+        addToScratchpadTitle: "新增到便箋",
         copyDescription: "將所選內容複製到剪貼簿。",
         cutDescription: "先複製所選內容，再將其移除。",
         pasteDescription: "用剪貼簿內容取代所選內容。",
-        deleteDescription: "移除所選內容但不複製。"
+        deleteDescription: "移除所選內容但不複製。",
+        pastePlainDescription: "效果相同，但會先移除字型、顏色和連結。",
+        uppercaseDescription: "將所選內容轉換為大寫。",
+        lowercaseDescription: "將所選內容轉換為小寫。",
+        capitalizeDescription: "將所選內容中每個單字的首字母大寫。",
+        removeSpacesDescription: "移除所選內容中的所有空格。",
+        underscoreDescription: "用底線取代空格。",
+        joinLinesDescription: "將多行合併為一行。",
+        commaListDescription: "將各行或各詞合併為以逗號分隔的清單。",
+        sortDescription: "依字母順序將行、詞或字母排序。",
+        reverseDescription: "反轉行、詞或字母的順序。",
+        randomDescription: "打亂行、詞或字母的順序。",
+        quotesDescription: "用引號將所選內容括起來。",
+        bracketsDescription: "用括號將所選內容括起來。",
+        urlEncodeDescription: "為 URL 對所選內容進行百分比編碼。",
+        urlDecodeDescription: "移除所選內容中的百分比編碼。",
+        base64EncodeDescription: "將所選內容編碼為 Base64。",
+        base64DecodeDescription: "將所選內容從 Base64 解碼。",
+        calculateDescription: "將所選內容作為數學運算式計算。",
+        addToScratchpadDescription: "將所選內容新增到便箋。"
     )
 
     static let zhHK = SelectionActionsStrings(
@@ -529,9 +1061,47 @@ extension SelectionActionsStrings {
         cutTitle: "剪下",
         pasteTitle: "貼上",
         deleteTitle: "刪除",
+        pastePlainTitle: "貼上為純文字",
+        uppercaseTitle: "大寫",
+        lowercaseTitle: "小寫",
+        capitalizeTitle: "首字母大寫",
+        removeSpacesTitle: "移除多餘空格",
+        underscoreTitle: "底線",
+        joinLinesTitle: "合併行",
+        commaListTitle: "逗號清單",
+        sortTitle: "排序",
+        reverseTitle: "反轉",
+        randomTitle: "隨機",
+        quotesTitle: "引號",
+        bracketsTitle: "括號",
+        urlEncodeTitle: "URL 編碼",
+        urlDecodeTitle: "URL 解碼",
+        base64EncodeTitle: "Base64 編碼",
+        base64DecodeTitle: "Base64 解碼",
+        calculateTitle: "計算",
+        addToScratchpadTitle: "新增到便箋",
         copyDescription: "將所選內容複製到剪貼簿。",
         cutDescription: "先複製所選內容，再將其移除。",
         pasteDescription: "用剪貼簿內容取代所選內容。",
-        deleteDescription: "移除所選內容但不複製。"
+        deleteDescription: "移除所選內容但不複製。",
+        pastePlainDescription: "效果相同，但會先移除字型、顏色和連結。",
+        uppercaseDescription: "將所選內容轉換為大寫。",
+        lowercaseDescription: "將所選內容轉換為小寫。",
+        capitalizeDescription: "將所選內容中每個單字的首字母大寫。",
+        removeSpacesDescription: "移除所選內容中的所有空格。",
+        underscoreDescription: "用底線取代空格。",
+        joinLinesDescription: "將多行合併為一行。",
+        commaListDescription: "將各行或各詞合併為以逗號分隔的清單。",
+        sortDescription: "依字母順序將行、詞或字母排序。",
+        reverseDescription: "反轉行、詞或字母的順序。",
+        randomDescription: "打亂行、詞或字母的順序。",
+        quotesDescription: "用引號將所選內容括起來。",
+        bracketsDescription: "用括號將所選內容括起來。",
+        urlEncodeDescription: "為 URL 對所選內容進行百分比編碼。",
+        urlDecodeDescription: "移除所選內容中的百分比編碼。",
+        base64EncodeDescription: "將所選內容編碼為 Base64。",
+        base64DecodeDescription: "將所選內容從 Base64 解碼。",
+        calculateDescription: "將所選內容作為數學運算式計算。",
+        addToScratchpadDescription: "將所選內容新增到便箋。"
     )
 }

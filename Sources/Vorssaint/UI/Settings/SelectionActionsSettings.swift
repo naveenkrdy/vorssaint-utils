@@ -12,7 +12,7 @@ struct SelectionActionsSettings: View {
     @AppStorage(DefaultsKey.selectionActionsShortcutEnabled) private var shortcutEnabled = true
     @AppStorage(DefaultsKey.selectionActionsEnabledActions) private var enabledActionsRaw = ""
     @AppStorage(DefaultsKey.selectionActionsDisplayStyle) private var displayStyleRaw = "icon"
-    @AppStorage(DefaultsKey.selectionActionsMaxVisible) private var maxVisible = 4
+    @AppStorage(DefaultsKey.selectionActionsMaxVisible) private var maxVisible = 8
     /// Read only so this view redraws when the drag order changes; the order
     /// itself is read and written through `PanelLayout`.
     @AppStorage(DefaultsKey.selectionActionsOrder) private var orderRaw = ""

@@ -1147,7 +1147,7 @@ enum Defaults {
         DefaultsKey.selectionActionsEnabledActions: SelectionActionCatalog.defaultEnabledStorageValue,
         DefaultsKey.selectionActionsDisplayStyle: "icon",
         DefaultsKey.selectionActionsOrder: "",
-        DefaultsKey.selectionActionsMaxVisible: 4,
+        DefaultsKey.selectionActionsMaxVisible: 8,
         DefaultsKey.selectionActionsExcludedApps: [String](),
         DefaultsKey.selectionActionsExcludedDomains: "",
         DefaultsKey.selectionActionsShortcutEnabled: true,

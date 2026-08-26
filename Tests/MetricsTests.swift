@@ -10478,6 +10478,29 @@ struct MetricsTests {
                 && !AppFeature.monitorPower.isBeta,
                "fan control is an on-demand beta with no broad permission")
 
+        // MARK: Selection Actions
+
+        expect(ArithmeticEvaluator.evaluate("2 + 3 * 4") == 14,
+               "arithmetic evaluator respects operator precedence")
+        expect(ArithmeticEvaluator.evaluate("(2 + 3) * 4") == 20,
+               "arithmetic evaluator respects parentheses")
+        expect(ArithmeticEvaluator.evaluate("10 / 0") == nil,
+               "arithmetic evaluator rejects division by zero instead of producing infinity")
+        expect(ArithmeticEvaluator.evaluate("3 + ") == nil,
+               "arithmetic evaluator returns nil on a trailing operator instead of crashing")
+        expect(SelectionActionCatalog.looksLikeExpression("2 + 2")
+                && !SelectionActionCatalog.looksLikeExpression("hello world")
+                && !SelectionActionCatalog.looksLikeExpression("42"),
+               "expression detection needs an operator, not just digits")
+        expect(TextListSupport.sorted("banana\napple\ncherry") == "apple\nbanana\ncherry",
+               "sorting a multi-line selection sorts by line")
+        expect(TextListSupport.sorted("banana apple cherry") == "apple banana cherry",
+               "sorting a single-line selection with spaces sorts by word")
+        expect(TextListSupport.sorted("dcba") == "abcd",
+               "sorting a single word with no spaces sorts by letter")
+        expect(TextListSupport.reversed("one\ntwo\nthree") == "three\ntwo\none",
+               "reversing a multi-line selection reverses line order, not each line's characters")
+
         // MARK: Hardware-gated installs
 
         // Availability is only ever written by the runtime that gates it, so
