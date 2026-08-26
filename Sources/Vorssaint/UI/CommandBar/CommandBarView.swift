@@ -791,8 +791,9 @@ struct CommandBarView: View {
     /// The full leftover-files checklist, in place for `.uninstallReview` -
     /// the same categories, sizes and per-item toggles `UninstallerView`
     /// shows in Settings, just inline in the bar. Homebrew-managed apps are
-    /// not handled here: pressing Remove on one hands off to Settings, where
-    /// the confirmation and live progress already live.
+    /// handled here too, not handed off to Settings: `.uninstallHomebrewConfirm`
+    /// guards the extra confirmation `brew uninstall` needs, and
+    /// `HomebrewOperationStatusView` renders its live progress inline.
     @ViewBuilder
     private var uninstallReviewCard: some View {
         switch uninstaller.phase {
@@ -996,7 +997,7 @@ struct CommandBarView: View {
         .padding(.horizontal, 17)
     }
 
-    private func uninstallReviewDone(freed: Int64, failed: Int) -> some View {
+    private func uninstallReviewDone(freed: Int64, failed: [AppUninstaller.Leftover]) -> some View {
         VStack(spacing: 9) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 28))
@@ -1006,7 +1007,7 @@ struct CommandBarView: View {
             Text(String(format: l10n.s.uninstallerFreedFormat, Self.uninstallByteString(freed)))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            if failed > 0 {
+            if !failed.isEmpty {
                 Text(l10n.s.uninstallerSomeFailed)
                     .font(.system(size: 10))
                     .foregroundStyle(.orange)

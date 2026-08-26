@@ -368,6 +368,19 @@ final class CommandBarService: ObservableObject {
         }
         removeMonitors()
         panel?.orderOut(nil)
+        // Leaving mid-review through this path (global shortcut, outside
+        // click) skipped the reset stepBack() does for the same mode -
+        // AppUninstaller kept its selected target and scanned checklist,
+        // which then showed up unprompted in Settings and the menu panel.
+        // Guarded the same way: don't tear down a Homebrew removal that's
+        // still actually running in the background.
+        switch mode {
+        case .uninstallReview, .uninstallHomebrewConfirm:
+            let uninstaller = AppUninstaller.shared
+            if !uninstaller.isRemovingWithHomebrew { uninstaller.reset() }
+        default:
+            break
+        }
         mode = .search
         // A selection belongs to the moment the bar was opened. Keeping it
         // would offer to act on text the person may have replaced since.
