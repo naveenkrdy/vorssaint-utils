@@ -1951,6 +1951,24 @@ struct MetricsTests {
                && !SpaceHopSupport.isOnFullscreenSpace(windowSpaces: [4], fullscreenSpaces: [8])
                && !SpaceHopSupport.isOnFullscreenSpace(windowSpaces: [], fullscreenSpaces: [8]),
                "App Switcher identifies fullscreen from Space type instead of window size")
+        expect(!SpaceHopSupport.ownerVouchIsIncomplete(hasNoWindowsForOwner: false, hadAttributeReadFailure: false),
+               "a clean pass that found at least one window is a real vouch")
+        expect(SpaceHopSupport.ownerVouchIsIncomplete(hasNoWindowsForOwner: true, hadAttributeReadFailure: false),
+               "an owner with zero windows and no read failures is the original #339 forgiveness case")
+        expect(SpaceHopSupport.ownerVouchIsIncomplete(hasNoWindowsForOwner: false, hadAttributeReadFailure: true),
+               "a read failure makes the vouch incomplete even when other windows for the same owner were found - the exact Dock Preview regression this guards against, where a busier hover pattern hits the 0.35s per-window AX timeout more often than the App Switcher's one-shot enumeration")
+        expect(SpaceHopSupport.ownerVouchIsIncomplete(hasNoWindowsForOwner: true, hadAttributeReadFailure: true),
+               "zero windows and a read failure together still count as incomplete")
+        // WindowEnumerator's hidden-Space veto must route the owner-vouch
+        // decision through ownerVouchIsIncomplete, not the bare
+        // `axSnapshot?.ordered.isEmpty` it wraps - reverting that one call
+        // site back to the bare check silently reopens the Dock Preview
+        // ghost/hidden-window regression this test file guards against.
+        let enumeratorSource = (try? String(
+            contentsOfFile: "Sources/Vorssaint/Services/Switcher/WindowEnumerator.swift",
+            encoding: .utf8)) ?? ""
+        expect(enumeratorSource.contains("SpaceHopSupport.ownerVouchIsIncomplete("),
+               "the hidden-Space veto's owner-vouch check routes through ownerVouchIsIncomplete")
         expect(SpaceHopSupport.isExcludedFromWindowCycle(windowTagsLow: 1 << 18),
                "a window-server surface marked to ignore cycling is excluded from the switcher")
         expect(!SpaceHopSupport.isExcludedFromWindowCycle(windowTagsLow: (1 << 19) | (1 << 22)),

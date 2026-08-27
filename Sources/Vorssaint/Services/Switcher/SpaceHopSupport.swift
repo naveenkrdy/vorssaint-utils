@@ -45,6 +45,19 @@ enum SpaceHopSupport {
         windowSpaces.contains { fullscreenSpaces.contains($0) }
     }
 
+    /// Whether an owner's "no window here" answer for a hidden-Space surface
+    /// can actually be trusted. `hasNoWindowsForOwner` being true only proves
+    /// this owner truly has nothing else when the pass that produced it was
+    /// otherwise reliable — a per-window Accessibility read that failed
+    /// partway through (the 0.35s messaging timeout can drop one real window
+    /// out of the results while its siblings still answer) means some
+    /// window's true answer was simply never obtained, not that it does not
+    /// exist, so an incomplete pass does not get to vouch for a window it is
+    /// missing.
+    static func ownerVouchIsIncomplete(hasNoWindowsForOwner: Bool, hadAttributeReadFailure: Bool) -> Bool {
+        hasNoWindowsForOwner || hadAttributeReadFailure
+    }
+
     /// The window server marks surfaces that must stay out of app window
     /// cycling. This remains meaningful when Accessibility cannot inspect a
     /// window because it lives on another Space.
