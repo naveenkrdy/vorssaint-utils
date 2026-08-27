@@ -1932,6 +1932,69 @@ struct MetricsTests {
                "a window-server surface marked to ignore cycling is excluded from the switcher")
         expect(!SpaceHopSupport.isExcludedFromWindowCycle(windowTagsLow: (1 << 19) | (1 << 22)),
                "other window-server tags do not hide a legitimate cross-Space window")
+        expect(SpaceHopSupport.hiddenSpaceSurfaceLooksLive(frameSize: CGSize(width: 10, height: 10),
+                                                           looksFullscreen: true,
+                                                           minimumParkedSize: CGSize(width: 320, height: 220)),
+               "a fullscreen-shaped surface is trusted regardless of its reported size")
+        expect(!SpaceHopSupport.hiddenSpaceSurfaceLooksLive(frameSize: CGSize(width: 300, height: 200),
+                                                            looksFullscreen: false,
+                                                            minimumParkedSize: CGSize(width: 320, height: 220)),
+               "a non-fullscreen surface smaller than the floor in both dimensions is not trusted")
+        expect(!SpaceHopSupport.hiddenSpaceSurfaceLooksLive(frameSize: CGSize(width: 400, height: 200),
+                                                            looksFullscreen: false,
+                                                            minimumParkedSize: CGSize(width: 320, height: 220)),
+               "a non-fullscreen surface has to clear the floor in both dimensions, not just one")
+        expect(SpaceHopSupport.hiddenSpaceSurfaceLooksLive(frameSize: CGSize(width: 320, height: 220),
+                                                           looksFullscreen: false,
+                                                           minimumParkedSize: CGSize(width: 320, height: 220)),
+               "a non-fullscreen surface exactly at the floor is trusted")
+        expect(SpaceHopSupport.hiddenSpaceSurfaceLooksLive(frameSize: CGSize(width: 800, height: 600),
+                                                           looksFullscreen: false,
+                                                           minimumParkedSize: CGSize(width: 320, height: 220)),
+               "a non-fullscreen surface well above the floor is trusted")
+        // Both places WindowEnumerator decides whether to trust a
+        // hidden-Space surface as real must go through
+        // hiddenSpaceSurfaceLooksReal, not the bare isOnHiddenSpace call it
+        // wraps -- reverting either site back to the bare call silently
+        // reopens the ghost-window bug this guards against. Counted across
+        // the whole file rather than sliced to one function: isOnHiddenSpace
+        // has other legitimate callers (the current-Space-only filter, the
+        // hidden-Space UI badge) this fix does not touch, so their presence
+        // must not make this check fail.
+        let enumeratorSource = (try? String(
+            contentsOfFile: "Sources/Vorssaint/Services/Switcher/WindowEnumerator.swift",
+            encoding: .utf8)) ?? ""
+        let enumeratorCode = enumeratorSource
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        let occurrences = enumeratorCode.components(separatedBy: "hiddenSpaceSurfaceLooksReal").count - 1
+        expect(occurrences == 3,
+               "hiddenSpaceSurfaceLooksReal is defined once and used at both ghost-veto bypass sites")
+        // Fixture values captured live: a real fullscreen Terminal window's
+        // reported height shifts as the auto-hiding menu bar slides over its
+        // content (1073 with the strip hidden, 1037 with it showing) against
+        // a fixed 1112pt-tall screen - a tight height tolerance rejects both,
+        // which is the bug that made a real second fullscreen window on
+        // another Space disappear from the switcher entirely.
+        let screenFrame = CGRect(x: 0, y: 0, width: 1710, height: 1112)
+        expect(SwitcherSupport.looksFullscreen(frame: CGRect(x: 0, y: 39, width: 1710, height: 1073),
+                                               screenFrame: screenFrame),
+               "a fullscreen window reported with the menu bar strip hidden is recognized")
+        expect(SwitcherSupport.looksFullscreen(frame: CGRect(x: 0, y: 75, width: 1710, height: 1037),
+                                               screenFrame: screenFrame),
+               "a fullscreen window reported with the menu bar strip showing is recognized")
+        expect(SwitcherSupport.looksFullscreen(frame: screenFrame, screenFrame: screenFrame),
+               "an exact frame-to-screen match is recognized")
+        expect(!SwitcherSupport.looksFullscreen(frame: CGRect(x: 1023, y: 307, width: 667, height: 628),
+                                                screenFrame: screenFrame),
+               "a dialog-sized window nowhere near the screen's width is not mistaken for fullscreen")
+        expect(!SwitcherSupport.looksFullscreen(frame: CGRect(x: 0, y: 0, width: 1710, height: 400),
+                                                screenFrame: screenFrame),
+               "matching width alone is not enough - height still has to be close to the screen's")
+        expect(!SwitcherSupport.looksFullscreen(frame: CGRect(x: 0, y: 0, width: 900, height: 1112),
+                                                screenFrame: screenFrame),
+               "matching height alone is not enough - width still has to match the screen's")
         expect(SpaceHopSupport.arrowSteps(orderedSpacesPerDisplay: [[3, 4, 5]],
                                           visibleSpaces: [3],
                                           target: 5) == 2,

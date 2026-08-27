@@ -20,6 +20,12 @@ import CoreGraphics
 enum WindowEnumerator {
     /// Window surfaces larger than this are considered real, switchable windows.
     private static let minimumSize = CGSize(width: 80, height: 60)
+    /// A surface parked on a hidden Space is only trusted as a real window,
+    /// rather than a stale leftover that kept an old Space tag, when it is
+    /// at least this large (or looks fullscreen). Starting value pending
+    /// on-device measurement of a real leftover Settings/dialog surface's
+    /// size against a real small parked window's.
+    private static let minimumParkedWindowSize = CGSize(width: 320, height: 220)
     /// Hard cap to keep the switcher readable and captures cheap.
     private static let maximumCount = 24
     /// AX calls normally return in a few milliseconds. A process that cannot
@@ -227,6 +233,11 @@ enum WindowEnumerator {
                   let windowOwnerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
                   let boundsDict = info[kCGWindowBounds as String] as? [String: Any]
             else { continue }
+            let cgFrame = CGRect(x: (boundsDict["X"] as? NSNumber)?.doubleValue ?? 0,
+                                 y: (boundsDict["Y"] as? NSNumber)?.doubleValue ?? 0,
+                                 width: (boundsDict["Width"] as? NSNumber)?.doubleValue ?? 0,
+                                 height: (boundsDict["Height"] as? NSNumber)?.doubleValue ?? 0)
+            let looksFullscreen = frameLooksFullscreen(cgFrame)
             let appPID = regularApps[windowOwnerPID] != nil
                 ? windowOwnerPID
                 : embeddedHostPIDs[windowOwnerPID]
@@ -253,12 +264,30 @@ enum WindowEnumerator {
                     windowSpaces: spaces(of: CGWindowID(windowID)))
             let axSnapshot = accessibilityWindows[windowOwnerPID]
             let axWindow = axSnapshot?.byID[CGWindowID(windowID)]
+            // A surface merely carrying a leftover Space tag is not enough to
+            // trust it as real: a dismissed dialog or Settings panel can keep
+            // one indefinitely if its backing surface is never fully torn
+            // down. When Accessibility already vouches for at least one of
+            // this owner's windows this pass, it has proven it can reach the
+            // app, so a surface it does not mention is far more likely a
+            // genuine leftover than one it simply could not see - the
+            // hidden-Space forgiveness is for when Accessibility cannot
+            // describe *any* of this owner's windows at all (the true #339
+            // case), not for a single surface missing from an otherwise
+            // populated list. A fullscreen-shaped surface is trusted either
+            // way (it runs in its own dedicated Space).
+            let axHasNoWindowsForOwner = axSnapshot?.byID.isEmpty ?? true
+            let hiddenSpaceSurfaceLooksReal = isOnHiddenSpace(CGWindowID(windowID))
+                && (looksFullscreen || axHasNoWindowsForOwner)
+                && SpaceHopSupport.hiddenSpaceSurfaceLooksLive(frameSize: cgFrame.size,
+                                                              looksFullscreen: looksFullscreen,
+                                                              minimumParkedSize: minimumParkedWindowSize)
             if axSnapshot != nil, axWindow == nil {
                 // WindowServer kept a surface Accessibility does not vouch for:
                 // a stale leftover from a closed tab or window. Windows parked
                 // on a hidden Space and confirmed hidden-app windows are real,
                 // so they survive this veto.
-                if (!isOnHiddenSpace(CGWindowID(windowID)) && !isConfirmedHiddenAppWindow)
+                if (!hiddenSpaceSurfaceLooksReal && !isConfirmedHiddenAppWindow)
                     || SpaceWindowBridge.isExcludedFromWindowCycle(CGWindowID(windowID)) {
                     continue
                 }
@@ -273,12 +302,8 @@ enum WindowEnumerator {
                 // The window server's own leftover signature decides instead.
                 continue
             }
-            let cgFrame = CGRect(x: (boundsDict["X"] as? NSNumber)?.doubleValue ?? 0,
-                                 y: (boundsDict["Y"] as? NSNumber)?.doubleValue ?? 0,
-                                 width: (boundsDict["Width"] as? NSNumber)?.doubleValue ?? 0,
-                                 height: (boundsDict["Height"] as? NSNumber)?.doubleValue ?? 0)
             let isMinimized = axWindow?.isMinimized ?? false
-            let isFullscreen = (axWindow?.isFullscreen ?? false) || frameLooksFullscreen(cgFrame)
+            let isFullscreen = (axWindow?.isFullscreen ?? false) || looksFullscreen
             guard let frame = switchableFrame(cgFrame, fallback: axWindow?.frame, isMinimized: isMinimized) else {
                 continue
             }
@@ -310,7 +335,7 @@ enum WindowEnumerator {
             // Windows the window server places on a hidden Space are equally
             // real even when untitled (their titles need Screen Recording).
             if !isOnScreen && displayTitle.isEmpty && axWindow == nil
-                && !isOnHiddenSpace(windowID) && !isConfirmedHiddenAppWindow { continue }
+                && !hiddenSpaceSurfaceLooksReal && !isConfirmedHiddenAppWindow { continue }
 
             seen.insert(windowID)
             windows.append(.window(id: windowID,
@@ -631,10 +656,7 @@ enum WindowEnumerator {
                                              screenFrames: [CGRect]? = nil) -> Bool {
         guard let frame else { return false }
         let frames = screenFrames ?? NSScreen.screens.map(\.frame)
-        return frames.contains { screenFrame in
-            abs(frame.width - screenFrame.width) <= 2
-                && abs(frame.height - screenFrame.height) <= 2
-        }
+        return frames.contains { SwitcherSupport.looksFullscreen(frame: frame, screenFrame: $0) }
     }
 
     private static func isUserFacingWindow(_ window: AXUIElement,
