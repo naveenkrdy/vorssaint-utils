@@ -306,19 +306,6 @@ enum SwitcherSupport {
         TimeInterval(sanitizedAppearanceDelay(milliseconds: milliseconds)) / 1000
     }
 
-    /// Whether `frame` is a fullscreen-Space surface for `screenFrame`. Width
-    /// is the reliable signal: a fullscreen-Space window always spans the
-    /// screen's full width, and an ordinary window almost never happens to
-    /// match it exactly. Height cannot use the same tight tolerance - the
-    /// menu bar auto-hides over fullscreen content, so a window's reported
-    /// height shifts by the menu bar's strip height as it slides in and out,
-    /// never settling at one fixed value close to the screen's own height.
-    static func looksFullscreen(frame: CGRect, screenFrame: CGRect) -> Bool {
-        abs(frame.width - screenFrame.width) <= 2
-            && frame.height >= screenFrame.height * 0.85
-            && frame.height <= screenFrame.height + 2
-    }
-
     /// How wide a window's name is in the font a card draws it in. Measured
     /// against the font rather than a layout pass, so a card can decide whether
     /// to scroll the name before the band has ever been on screen -- and a test

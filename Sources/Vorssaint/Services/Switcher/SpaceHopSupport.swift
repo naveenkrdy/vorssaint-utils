@@ -37,19 +37,12 @@ enum SpaceHopSupport {
         return !windowSpaces.contains { visibleSpaces.contains($0) }
     }
 
-    /// A stale leftover surface can keep an old Space tag after its window is
-    /// gone (the assumption above — a real window belongs to a Space, a
-    /// leftover belongs to none — breaks whenever that tag is never
-    /// cleared). A genuinely fullscreen window is essentially always
-    /// screen-sized, which a leftover dialog or Settings panel is not;
-    /// anything smaller must clear a higher bar before the hidden-Space veto
-    /// override trusts it as real.
-    static func hiddenSpaceSurfaceLooksLive(frameSize: CGSize,
-                                            looksFullscreen: Bool,
-                                            minimumParkedSize: CGSize) -> Bool {
-        looksFullscreen
-            || (frameSize.width >= minimumParkedSize.width
-                && frameSize.height >= minimumParkedSize.height)
+    /// Whether at least one Space assigned to a window is a native fullscreen
+    /// Space. This is stronger than guessing from the window frame: a tiled or
+    /// zoomed window can fill the same rectangle without owning its own Space.
+    static func isOnFullscreenSpace(windowSpaces: [UInt64],
+                                    fullscreenSpaces: Set<UInt64>) -> Bool {
+        windowSpaces.contains { fullscreenSpaces.contains($0) }
     }
 
     /// The window server marks surfaces that must stay out of app window
