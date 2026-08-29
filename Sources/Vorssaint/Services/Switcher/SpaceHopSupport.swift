@@ -45,16 +45,15 @@ enum SpaceHopSupport {
         windowSpaces.contains { fullscreenSpaces.contains($0) }
     }
 
-    /// Whether an owner's "no window here" answer for a hidden-Space surface
-    /// can actually be trusted. `hasNoWindowsForOwner` being true only proves
-    /// this owner truly has nothing else when the pass that produced it was
-    /// otherwise reliable — a per-window Accessibility read that failed
-    /// partway through (the 0.35s messaging timeout can drop one real window
-    /// out of the results while its siblings still answer) means some
-    /// window's true answer was simply never obtained, not that it does not
-    /// exist, so an incomplete pass does not get to vouch for a window it is
-    /// missing.
-    static func ownerVouchIsIncomplete(hasNoWindowsForOwner: Bool, hadAttributeReadFailure: Bool) -> Bool {
+    /// Whether the hidden-Space stale-surface veto should be skipped for this
+    /// owner: either it genuinely reported zero windows (the original #339
+    /// forgiveness case, and the most complete a vouch can be), or a
+    /// per-window Accessibility read failed partway through this pass (the
+    /// 0.35s messaging timeout can drop one real window out of the results
+    /// while its siblings still answer) — that window's true answer was
+    /// simply never obtained, not proven absent, so this incomplete pass
+    /// does not get to veto a window it is missing.
+    static func shouldSkipStaleSurfaceVeto(hasNoWindowsForOwner: Bool, hadAttributeReadFailure: Bool) -> Bool {
         hasNoWindowsForOwner || hadAttributeReadFailure
     }
 

@@ -278,11 +278,11 @@ enum WindowEnumerator {
             // pass does not get to vouch for a window it is missing), or when
             // the window server puts this exact surface on a native
             // fullscreen Space.
-            let ownerVouchIsIncomplete = SpaceHopSupport.ownerVouchIsIncomplete(
+            let staleSurfaceVetoShouldBeSkipped = SpaceHopSupport.shouldSkipStaleSurfaceVeto(
                 hasNoWindowsForOwner: axSnapshot?.ordered.isEmpty ?? true,
                 hadAttributeReadFailure: axSnapshot?.hadAttributeReadFailure ?? false)
             let hiddenSpaceSurfaceIsWitnessed = isOnHiddenSpace(CGWindowID(windowID))
-                && (ownerVouchIsIncomplete
+                && (staleSurfaceVetoShouldBeSkipped
                     || isOnFullscreenSpace(CGWindowID(windowID)))
             if axSnapshot != nil, axWindow == nil {
                 // WindowServer kept a surface Accessibility does not vouch for:
@@ -551,8 +551,12 @@ enum WindowEnumerator {
         var byID: [CGWindowID: AccessibilityWindowSnapshot] = [:]
         var ordered: [(id: CGWindowID, snapshot: AccessibilityWindowSnapshot)] = []
         for window in axWindows {
-            if let id = AXWindowResolver.windowID(for: window) {
-                let frame = accessibilityFrame(for: window)
+            let idAttr = AXWindowResolver.readWindowID(for: window)
+            if idAttr.timedOut { hadAttributeReadFailure = true }
+            if let id = idAttr.id {
+                let frameAttr = accessibilityFrame(for: window)
+                if frameAttr.timedOut { hadAttributeReadFailure = true }
+                let frame = frameAttr.frame
                 let isMinimizedAttr = readBoolAttribute(window, kAXMinimizedAttribute as String)
                 if isMinimizedAttr.timedOut { hadAttributeReadFailure = true }
                 let snapshot = AccessibilityWindowSnapshot(title: accessibilityTitle(for: window),
@@ -642,23 +646,30 @@ enum WindowEnumerator {
         return value as? String ?? ""
     }
 
-    private static func accessibilityFrame(for window: AXUIElement) -> CGRect? {
+    /// Reports whether either attribute read hit its messaging timeout, same
+    /// reason as `readStringAttribute`/`readBoolAttribute`: a caller deciding
+    /// whether an absent frame means "AX has nothing to say" needs to tell
+    /// that apart from "AX never answered in time".
+    private static func accessibilityFrame(for window: AXUIElement) -> (frame: CGRect?, timedOut: Bool) {
         var positionValue: CFTypeRef?
         var sizeValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
-              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue) == .success,
+        let positionResult = AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue)
+        let sizeResult = AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue)
+        let timedOut = positionResult == .cannotComplete || sizeResult == .cannotComplete
+        guard positionResult == .success,
+              sizeResult == .success,
               let positionValue,
               let sizeValue,
               CFGetTypeID(positionValue) == AXValueGetTypeID(),
               CFGetTypeID(sizeValue) == AXValueGetTypeID()
-        else { return nil }
+        else { return (nil, timedOut) }
 
         var position = CGPoint.zero
         var size = CGSize.zero
         guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
-        else { return nil }
-        return CGRect(origin: position, size: size)
+        else { return (nil, timedOut) }
+        return (CGRect(origin: position, size: size), timedOut)
     }
 
     private static func frameIsSwitchable(_ frame: CGRect) -> Bool {
@@ -709,8 +720,10 @@ enum WindowEnumerator {
             if roleAttr.timedOut { hadReadFailure = true }
             let role = roleAttr.value
             let canBePlaybackSurface = subrole == "AXUnknown" || subrole == "AXFloatingWindow"
+            let frameAttr = accessibilityFrame(for: window)
+            if frameAttr.timedOut { hadReadFailure = true }
             let fillsScreen = canBePlaybackSurface
-                && frameLooksFullscreen(accessibilityFrame(for: window), screenFrames: screenFrames)
+                && frameLooksFullscreen(frameAttr.frame, screenFrames: screenFrames)
             // Compatibility-layer processes draw their own window chrome on
             // borderless surfaces, which Accessibility reports as AXUnknown;
             // for them the window role is the real signal.
@@ -773,14 +786,6 @@ enum WindowEnumerator {
             return (value as? Bool, false)
         }
         return (CFBooleanGetValue((value as! CFBoolean)), false)
-    }
-
-    private static func stringAttribute(_ element: AXUIElement, _ attribute: String) -> String? {
-        readStringAttribute(element, attribute).value
-    }
-
-    private static func boolAttribute(_ element: AXUIElement, _ attribute: String) -> Bool {
-        readBoolAttribute(element, attribute).value ?? false
     }
 
     /// Adds the apps that are running with no window to switch to, so the list
