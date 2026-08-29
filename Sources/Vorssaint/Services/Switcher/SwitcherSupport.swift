@@ -155,7 +155,9 @@ enum SwitcherGridCard {
 enum SwitcherSearchChip {
     /// Distance from the panel's top-trailing corner to the capsule itself.
     static let cornerInset: CGFloat = 12
-    /// One 12pt semibold text line plus 7pt top/bottom padding, measured.
+    /// The capsule's own `.frame(height:)` enforces this in the view, so a
+    /// future font/padding change clips or gaps visibly instead of silently
+    /// drifting from what the panel formula reserved for it.
     static let height: CGFloat = 29
     /// Corner inset + capsule height, plus a small gap so the capsule reads
     /// as floating above the content instead of touching its edge.

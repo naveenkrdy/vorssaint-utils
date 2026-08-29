@@ -7907,6 +7907,18 @@ struct MetricsTests {
                                                                        showsSearchChip: false)
         expect(noSearchChipIconRowLayout.panelSize.height == iconRowLayout.panelSize.height,
                "App Switcher reserves no extra height when the search chip is hidden")
+        // Nothing in this harness can render SwiftUI, so `SwitcherSearchChip
+        // .height` being right is not checkable here - only that the view
+        // actually enforces it instead of leaving it a hand-derived number
+        // that only happens to match today's font/padding. A future change
+        // to either now clips or gaps the capsule visibly instead of
+        // silently drifting back out of sync with what the panel formula
+        // above reserves for it.
+        let switcherViewSource = (try? String(
+            contentsOfFile: "Sources/Vorssaint/UI/Switcher/SwitcherView.swift",
+            encoding: .utf8)) ?? ""
+        expect(switcherViewSource.contains(".frame(height: SwitcherSearchChip.height)"),
+               "the search chip's own rendered height must be pinned to SwitcherSearchChip.height, not just documented as matching it")
         expect(SwitcherSupport.gridColumnCount(itemCount: 10, maxColumns: 8) == 5,
                "App Switcher wrapping splits ten windows across two even rows")
         expect(SwitcherSupport.gridColumnCount(itemCount: 9, maxColumns: 8) == 5,

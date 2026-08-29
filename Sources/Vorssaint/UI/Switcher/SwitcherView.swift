@@ -146,6 +146,7 @@ struct SwitcherView: View {
             .foregroundStyle(.primary)
             .padding(.horizontal, 11)
             .padding(.vertical, 7)
+            .frame(height: SwitcherSearchChip.height)
             .background(
                 Capsule(style: .continuous)
                     .fill(Color.black.opacity(0.42))
