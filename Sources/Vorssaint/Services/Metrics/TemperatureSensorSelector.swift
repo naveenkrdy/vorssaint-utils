@@ -10,6 +10,7 @@ enum CPUTemperaturePlatform: Equatable {
     case appleM3Family
     case appleM4Family
     case appleM5Family
+    case unmappedAppleSilicon
     case generic
 }
 
@@ -57,24 +58,27 @@ enum TemperatureSensorSelector {
 
     static func platform(brandString: String?) -> CPUTemperaturePlatform {
         let brand = brandString?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Preserve the established Tp/Te reading path for this supported chip
+        // until a verified per-core map is available.
+        if brand == "Apple A18 Pro" { return .generic }
         switch appleSiliconGeneration(in: brand) {
         case 1: return .appleM1Family
         case 2: return .appleM2Family
         case 3: return .appleM3Family
         case 4: return .appleM4Family
         case 5: return .appleM5Family
-        default: return .generic
+        default: return brand.hasPrefix("Apple ") ? .unmappedAppleSilicon : .generic
         }
     }
 
     static func currentPlatform() -> CPUTemperaturePlatform {
         var size = 0
         guard sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0) == 0, size > 0 else {
-            return .generic
+            return .unmappedAppleSilicon
         }
         var buffer = [CChar](repeating: 0, count: size)
         guard sysctlbyname("machdep.cpu.brand_string", &buffer, &size, nil, 0) == 0 else {
-            return .generic
+            return .unmappedAppleSilicon
         }
         return platform(brandString: String(cString: buffer))
     }
@@ -88,6 +92,12 @@ enum TemperatureSensorSelector {
         if let value = core.map({ $0.value }).max() {
             return value
         }
+        // Not every Mac carries the sensors its chip generation is mapped to.
+        // One that does not showed the hottest reading of its CPU families
+        // instead, for as long as the app has had this panel, until 3.3.3
+        // restricted the answer to the mapped sensors and left those Macs with
+        // nothing. This is that reading, restored exactly. Fan control is a
+        // separate decision and keeps requiring its own mapped readings.
         return valid.map { $0.value }.max()
     }
 
@@ -95,7 +105,7 @@ enum TemperatureSensorSelector {
         switch platform {
         case .appleM1Family, .appleM2Family, .appleM3Family, .appleM4Family, .appleM5Family:
             return true
-        case .generic: return false
+        case .unmappedAppleSilicon, .generic: return false
         }
     }
 
@@ -111,7 +121,7 @@ enum TemperatureSensorSelector {
             return appleM4CPUCoreKeys.contains(key)
         case .appleM5Family:
             return appleM5CPUCoreKeys.contains(key)
-        case .generic:
+        case .unmappedAppleSilicon, .generic:
             return false
         }
     }

@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Vorssaint
 
+import ApplicationServices
 import Foundation
 
 enum AutoQuitWindowEvent: Equatable {
     case windowDestroyed
     case appHidden
     case appDeactivated
+    case appActivated
     case mainWindowChanged
     case focusedWindowChanged
     case windowCreated
@@ -36,6 +38,7 @@ enum AutoQuitSupport {
         case .appHidden:
             return hasRecentCloseRequest
         case .appDeactivated,
+             .appActivated,
              .mainWindowChanged,
              .focusedWindowChanged,
              .windowCreated,
@@ -44,6 +47,30 @@ enum AutoQuitSupport {
              .other:
             return false
         }
+    }
+
+    /// Every found user window requires a registered destroy notification.
+    /// Accessibility-listed windows set that count directly; window-server
+    /// evidence when Accessibility lists none still requires one watch.
+    /// An app that has never yet shown any window also retries during its initial
+    /// watch window so apps creating windows asynchronously on launch are caught.
+    static func needsWindowWatchRetry(registeredWindows: Int,
+                                      listedWindows: Int,
+                                      foundUserWindow: Bool,
+                                      hadPriorWindows: Bool = false) -> Bool {
+        if foundUserWindow {
+            return registeredWindows < max(listedWindows, 1)
+        }
+        return !hadPriorWindows && registeredWindows == 0
+    }
+
+    /// Whether adding a window notification left the observer watching for it.
+    /// Already registered is the ordinary answer, not a failure: every refresh
+    /// registers the windows it is already watching again, and counting those
+    /// as unwatched would zero the count above on every refresh and leave the
+    /// retry firing for as long as the app runs.
+    static func isWindowNotificationRegistered(_ result: AXError) -> Bool {
+        result == .success || result == .notificationAlreadyRegistered
     }
 
     static func shouldQuitAfterWindowCheck(hadWindows: Bool,
@@ -100,6 +127,19 @@ enum AutoQuitSupport {
 
     static func isCommandW(keyCode: Int64, command: Bool, control: Bool) -> Bool {
         keyCode == commandWKeyCode && command && !control
+    }
+
+    /// Phone is kept as a mandatory quit exception for Continuity calls, but on
+    /// macOS builds without Phone.app a locked row would show the raw bundle
+    /// id. Hide it from the settings list while leaving protection in place.
+    static func shouldDisplayException(bundleID: String, isInstalled: Bool) -> Bool {
+        if bundleID == Defaults.phoneBundleIdentifier { return isInstalled }
+        return true
+    }
+
+    static func visibleExceptions(_ bundleIDs: [String],
+                                  isInstalled: (String) -> Bool) -> [String] {
+        bundleIDs.filter { shouldDisplayException(bundleID: $0, isInstalled: isInstalled($0)) }
     }
 
     /// Whether a window the screen is not showing still counts as a window the

@@ -5,7 +5,7 @@ import Foundation
 
 /// Everything the app update check decides, with no file system, no network
 /// and no processes: version comparison, which findings are real, how the
-/// two sources are merged and when the next background check is due. Kept
+/// the sources are merged and when the next background check is due. Kept
 /// pure so `./build.sh --test` can pin the rules that matter.
 enum AppUpdatesSupport {
 
@@ -13,10 +13,19 @@ enum AppUpdatesSupport {
 
     /// Where a pending update comes from, which is also what the app can do
     /// about it: the package manager can install it right here, the store
-    /// can only be opened.
+    /// can only be opened, and an online finding opens the installed app.
     enum Source: String, Hashable {
         case packageManager
         case appStore
+        case onlineCatalog
+
+        fileprivate var sortOrder: Int {
+            switch self {
+            case .packageManager: return 0
+            case .appStore: return 1
+            case .onlineCatalog: return 2
+            }
+        }
     }
 
     struct Item: Identifiable, Hashable {
@@ -34,6 +43,7 @@ enum AppUpdatesSupport {
         let storePage: String?
 
         var canInstallInPlace: Bool { source == .packageManager && token != nil }
+        var isSelectable: Bool { source != .onlineCatalog }
         var versionSummary: String { "\(installedVersion) → \(latestVersion)" }
     }
 
@@ -44,6 +54,9 @@ enum AppUpdatesSupport {
         let path: String
         let version: String
         let isFromAppStore: Bool
+        var buildVersion: String = ""
+        var storeID: String? = nil
+        var updateFeed: AppUpdateFeedSupport.Feed? = nil
     }
 
     /// One app's current version in the store.
@@ -52,6 +65,19 @@ enum AppUpdatesSupport {
         let version: String
         let minimumOSVersion: String?
         let page: String?
+    }
+
+    /// The small, stable subset of one public catalog entry needed to match
+    /// an installed bundle without treating that catalog as installation
+    /// ownership.
+    struct CatalogEntry: Hashable {
+        let token: String
+        let version: String
+        let appNames: [String]
+        let bundleIDs: [String]
+        let minimumOSVersions: [String]
+        let exactOSVersions: [String]
+        let hasUnsupportedOSConstraint: Bool
     }
 
     // MARK: - Version comparison
@@ -165,7 +191,8 @@ enum AppUpdatesSupport {
             guard !ignoredTokens.contains(update.name) else { return nil }
             guard !isUncomparable(update.currentVersion) else { return nil }
             guard let record = recordsByToken[update.name],
-                  let bundle = packageBundle(for: record, apps: apps) else {
+                  let bundle = packageBundle(for: record, apps: apps),
+                  !bundle.isFromAppStore else {
                 return nil
             }
             let installedVersion = bundle.version
@@ -252,6 +279,45 @@ enum AppUpdatesSupport {
         return components?.url
     }
 
+    static func storeIDLookupURL(ids: [String], country: String?) -> URL? {
+        guard !ids.isEmpty, ids.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isASCII && $0.isNumber } }) else { return nil }
+        var components = URLComponents(string: "https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.woa/wa/lookup")
+        var query = [URLQueryItem(name: "id", value: ids.joined(separator: ",")),
+                     URLQueryItem(name: "version", value: "2"),
+                     URLQueryItem(name: "p", value: "mdm-lockup"),
+                     URLQueryItem(name: "caller", value: "MDM"),
+                     URLQueryItem(name: "platform", value: "macappstore")]
+        if let country, !country.isEmpty { query.append(URLQueryItem(name: "cc", value: country)) }
+        components?.queryItems = query
+        return components?.url
+    }
+
+    /// The platform-specific lookup supplies the Mac build and Mac minimum
+    /// OS even for a universal listing whose generic result describes mobile.
+    static func storeMetadataResponse(_ data: Data?, statusCode: Int?) -> [String: StoreEntry] {
+        guard let data, let statusCode, (200..<300).contains(statusCode),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = root["results"] as? [String: [String: Any]] else { return [:] }
+        var entries: [String: StoreEntry] = [:]
+        for result in results.values {
+            guard let families = result["deviceFamilies"] as? [String], families.contains("mac"),
+                  let bundleID = result["bundleId"] as? String, !bundleID.isEmpty,
+                  let minimum = result["minimumOSVersion"] as? String, !minimum.isEmpty,
+                  let offers = result["offers"] as? [[String: Any]] else { continue }
+            let versions = offers.compactMap { offer -> String? in
+                guard let assets = offer["assets"] as? [[String: Any]],
+                      assets.contains(where: { $0["flavor"] as? String == "macSoftware" }),
+                      let version = offer["version"] as? [String: Any],
+                      let display = version["display"] as? String, !display.isEmpty else { return nil }
+                return display
+            }
+            guard let version = versions.max(by: { compare($0, $1) == .orderedAscending }) else { continue }
+            entries[bundleID] = StoreEntry(bundleID: bundleID, version: version,
+                                           minimumOSVersion: minimum, page: result["url"] as? String)
+        }
+        return entries
+    }
+
     static func parseStoreLookup(_ data: Data) -> [String: StoreEntry] {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let results = root["results"] as? [[String: Any]] else { return [:] }
@@ -270,6 +336,26 @@ enum AppUpdatesSupport {
                                            page: result["trackViewUrl"] as? String)
         }
         return entries
+    }
+
+    static func storeLookupResponse(_ data: Data?, statusCode: Int?) -> [String: StoreEntry] {
+        guard let data, let statusCode, (200..<300).contains(statusCode) else {
+            return [:]
+        }
+        return parseStoreLookup(data)
+    }
+
+    /// A successful request can still omit apps unavailable in this catalog
+    /// or region. Only the combined answer can establish complete coverage.
+    static func hasStoreCoverage(bundleIDs: [String], entries: [String: StoreEntry]) -> Bool {
+        bundleIDs.allSatisfy { entries[$0] != nil }
+    }
+
+    /// Keep partial source failures visible without listing apps whose own
+    /// publisher already answered, or repeating one app for several sources.
+    static func uncheckedAppNames(_ apps: [InstalledApp], checkedPaths: Set<String>) -> [String] {
+        Set(apps.filter { !checkedPaths.contains($0.path) }.map(\.name))
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     static func appStoreUpdates(apps: [InstalledApp],
@@ -291,13 +377,213 @@ enum AppUpdatesSupport {
         }
     }
 
+    // MARK: - Online catalog source
+
+    static let onlineCatalogURL = URL(string: "https://formulae.brew.sh/api/cask.json")!
+
+    /// Decodes only catalog fields that can prove an exact app-bundle match,
+    /// a comparable version and macOS compatibility. Unknown fields remain
+    /// ignored, while an unknown macOS constraint makes that entry ineligible.
+    static func parseOnlineCatalog(_ data: Data) -> [CatalogEntry]? {
+        guard let rawEntries = try? JSONDecoder().decode([RawCatalogEntry].self, from: data) else {
+            return nil
+        }
+        return rawEntries.compactMap { raw in
+            var appNames: [String] = []
+            var bundleIDs: [String] = []
+            for artifact in raw.artifacts {
+                if let app = artifact.app {
+                    let targets = app.compactMap(\.target)
+                    let finalNames: [String]
+                    if let target = artifact.target, target.hasSuffix(".app") {
+                        finalNames = [target]
+                    } else {
+                        finalNames = targets.isEmpty ? app.compactMap(\.source) : targets
+                    }
+                    appNames.append(contentsOf: finalNames.map(bundleName))
+                }
+                bundleIDs.append(contentsOf: artifact.uninstall?.flatMap(\.quit) ?? [])
+                appNames.append(contentsOf: artifact.uninstall?.flatMap(\.appNames) ?? [])
+            }
+            appNames = uniqueNonempty(appNames)
+            bundleIDs = uniqueNonempty(bundleIDs)
+            guard !appNames.isEmpty || !bundleIDs.isEmpty else { return nil }
+            let constraints = raw.dependsOn?.macOS ?? [:]
+            return CatalogEntry(
+                token: raw.token,
+                version: raw.version,
+                appNames: appNames,
+                bundleIDs: bundleIDs,
+                minimumOSVersions: constraints[">="] ?? [],
+                exactOSVersions: constraints["=="] ?? [],
+                hasUnsupportedOSConstraint: constraints.keys.contains { $0 != ">=" && $0 != "==" })
+        }
+    }
+
+    /// A missing body, failed HTTP response or malformed document all mean
+    /// incomplete coverage, never an empty-but-successful catalog.
+    static func parseOnlineCatalogResponse(_ data: Data?, statusCode: Int?) -> [CatalogEntry]? {
+        guard let data, let statusCode, (200..<300).contains(statusCode) else { return nil }
+        return parseOnlineCatalog(data)
+    }
+
+    /// Apps the online catalog may answer for. Store receipts and anything
+    /// already owned by the package source never cross into this source.
+    static func onlineCatalogCandidates(apps: [InstalledApp],
+                                        coveredPaths: Set<String>) -> [InstalledApp] {
+        apps.filter {
+            !$0.isFromAppStore
+                && !$0.bundleID.isEmpty
+                && !$0.version.isEmpty
+                && !coveredPaths.contains($0.path)
+        }
+    }
+
+    /// Exact names take priority; a single identity also finds renamed apps
+    /// and installer packages without confusing companion apps with the owner.
+    static func onlineCatalogFindings(apps: [InstalledApp],
+                                      catalog: [CatalogEntry],
+                                      operatingSystemVersion: String,
+                                      ignoredTokens: Set<String> = []) -> (items: [Item], checkedPaths: Set<String>) {
+        var entriesByName: [String: [CatalogEntry]] = [:]
+        var entriesByID: [String: [CatalogEntry]] = [:]
+        for entry in catalog where !ignoredTokens.contains(entry.token) {
+            for name in entry.appNames {
+                entriesByName[name, default: []].append(entry)
+            }
+            // An uninstall list can also name companion apps it must quit.
+            // Only a single declared identity can stand in for a filename.
+            if entry.bundleIDs.count == 1, let id = entry.bundleIDs.first {
+                entriesByID[id, default: []].append(entry)
+            }
+        }
+
+        var checkedPaths = Set<String>()
+        let items = apps.compactMap { app -> Item? in
+            let installedName = URL(fileURLWithPath: app.path).lastPathComponent
+            let named = entriesByName[installedName] ?? []
+            let matches = named.isEmpty
+                ? entriesByID[app.bundleID] ?? []
+                : named.filter { $0.bundleIDs.isEmpty || $0.bundleIDs.contains(app.bundleID) }
+            guard matches.count == 1, let entry = matches.first else { return nil }
+            guard !isUncomparable(entry.version),
+                  isCompatible(entry,
+                               operatingSystemVersion: operatingSystemVersion) else { return nil }
+            // Current versions are covered too; absence of a row alone proves nothing.
+            if !isUncomparable(app.version) { checkedPaths.insert(app.path) }
+            let latest = versionCore(entry.version)
+            guard isNewer(latest, than: app.version) else { return nil }
+            return Item(id: "\(Source.onlineCatalog.rawValue):\(app.path)",
+                        source: .onlineCatalog,
+                        name: app.name,
+                        installedVersion: app.version,
+                        latestVersion: latest,
+                        token: nil,
+                        bundlePath: app.path,
+                        storePage: nil)
+        }
+        return (items, checkedPaths)
+    }
+
+    private static func isCompatible(_ entry: CatalogEntry,
+                                     operatingSystemVersion: String) -> Bool {
+        guard !entry.hasUnsupportedOSConstraint else { return false }
+        guard entry.minimumOSVersions.allSatisfy({
+            compare(operatingSystemVersion, $0) != .orderedAscending
+        }) else { return false }
+        guard !entry.exactOSVersions.isEmpty else { return true }
+        return entry.exactOSVersions.contains {
+            compare(operatingSystemVersion, $0) == .orderedSame
+                || operatingSystemVersion.hasPrefix("\($0).")
+        }
+    }
+
+    private static func bundleName(_ path: String) -> String {
+        URL(fileURLWithPath: path).lastPathComponent
+    }
+
+    private static func uniqueNonempty(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    private struct RawCatalogEntry: Decodable {
+        let token: String
+        let version: String
+        let artifacts: [RawCatalogArtifact]
+        let dependsOn: RawCatalogDependencies?
+
+        enum CodingKeys: String, CodingKey {
+            case token, version, artifacts
+            case dependsOn = "depends_on"
+        }
+    }
+
+    private struct RawCatalogDependencies: Decodable {
+        let macOS: [String: [String]]?
+
+        enum CodingKeys: String, CodingKey {
+            case macOS = "macos"
+        }
+    }
+
+    private struct RawCatalogArtifact: Decodable {
+        let app: [RawCatalogApp]?
+        let target: String?
+        let uninstall: [RawCatalogUninstall]?
+    }
+
+    private struct RawCatalogApp: Decodable {
+        let source: String?
+        let target: String?
+
+        enum CodingKeys: String, CodingKey { case target }
+
+        init(from decoder: Decoder) throws {
+            if let value = try? decoder.singleValueContainer().decode(String.self) {
+                source = value
+                target = nil
+                return
+            }
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            source = nil
+            target = try container.decode(String.self, forKey: .target)
+        }
+    }
+
+    private struct RawCatalogUninstall: Decodable {
+        let quit: [String]
+        let appNames: [String]
+
+        enum CodingKeys: String, CodingKey { case quit, delete }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            func strings(_ key: CodingKeys) -> [String] {
+                if let values = try? container.decode([String].self, forKey: key) { return values }
+                if let value = try? container.decode(String.self, forKey: key) { return [value] }
+                return []
+            }
+            quit = strings(.quit)
+            // Installer packages often declare their app only in removal
+            // metadata. Accept a literal app in a standard application folder.
+            appNames = strings(.delete).filter {
+                let parent = ($0 as NSString).deletingLastPathComponent
+                return (parent == "/Applications" || parent == "~/Applications")
+                    && $0.hasSuffix(".app") && !$0.contains(where: { "*?[]".contains($0) })
+            }.map { ($0 as NSString).lastPathComponent }
+        }
+    }
+
     /// One list for the panel: apps that can be updated on the spot first,
-    /// then the ones that need the store, each group alphabetical.
+    /// then store and online findings, each group alphabetical.
     static func merged(_ groups: [Item]...) -> [Item] {
         var seen = Set<String>()
         let all = groups.flatMap { $0 }.filter { seen.insert($0.id).inserted }
         return all.sorted { lhs, rhs in
-            if lhs.canInstallInPlace != rhs.canInstallInPlace { return lhs.canInstallInPlace }
+            if lhs.source.sortOrder != rhs.source.sortOrder {
+                return lhs.source.sortOrder < rhs.source.sortOrder
+            }
             return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
     }
@@ -327,8 +613,9 @@ enum AppUpdatesSupport {
     static func reconciledSelection(previous: Set<String>,
                                     knownIDs: Set<String>,
                                     items: [Item]) -> Set<String> {
-        var next = previous.intersection(Set(items.map(\.id)))
-        for item in items where !knownIDs.contains(item.id) {
+        let selectable = items.filter(\.isSelectable)
+        var next = previous.intersection(Set(selectable.map(\.id)))
+        for item in selectable where !knownIDs.contains(item.id) {
             next.insert(item.id)
         }
         return next

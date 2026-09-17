@@ -4,23 +4,28 @@
 import CoreGraphics
 import Foundation
 
-/// The mouse features that can be told to leave an app alone (issue #358).
+/// The mouse and keyboard features that can be told to leave an app alone
+/// (issues #358, #741).
 /// Each one keeps its OWN list, right under its switch in Settings: excepting
 /// an app from the wheel's glide must not also silence the side buttons there.
 enum MouseExceptionScope: String, CaseIterable {
     case smoothScroll
     case scrollDirection
+    case focusFollowsMouse
     case navigation
     case buttonShortcuts
     case middleClick
+    case superKey
 
     var defaultsKey: String {
         switch self {
         case .smoothScroll: return DefaultsKey.smoothScrollExceptions
         case .scrollDirection: return DefaultsKey.scrollInverterExceptions
+        case .focusFollowsMouse: return DefaultsKey.focusFollowsMouseExceptions
         case .navigation: return DefaultsKey.mouseNavigationExceptions
         case .buttonShortcuts: return DefaultsKey.mouseButtonExceptions
         case .middleClick: return DefaultsKey.middleClickExceptions
+        case .superKey: return DefaultsKey.superKeyExceptions
         }
     }
 
@@ -30,9 +35,11 @@ enum MouseExceptionScope: String, CaseIterable {
         switch self {
         case .smoothScroll: return .smoothScroll
         case .scrollDirection: return .scrollInverter
+        case .focusFollowsMouse: return .focusFollowsMouse
         case .navigation: return .mouseNavigation
         case .buttonShortcuts: return .mouseButtonShortcuts
         case .middleClick: return .middleClick
+        case .superKey: return .superKey
         }
     }
 }
@@ -53,6 +60,23 @@ enum MouseAppExceptionSupport {
             self.layer = layer
             self.alpha = alpha
             self.processID = processID
+        }
+    }
+
+    static func windows(from descriptions: [[String: Any]]) -> [Window] {
+        descriptions.compactMap { info in
+            guard let raw = info[kCGWindowBounds as String] as? [String: Any],
+                  let x = (raw["X"] as? NSNumber)?.doubleValue,
+                  let y = (raw["Y"] as? NSNumber)?.doubleValue,
+                  let width = (raw["Width"] as? NSNumber)?.doubleValue,
+                  let height = (raw["Height"] as? NSNumber)?.doubleValue,
+                  let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue,
+                  let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value
+            else { return nil }
+            return Window(frame: CGRect(x: x, y: y, width: width, height: height),
+                          layer: layer,
+                          alpha: (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1,
+                          processID: pid)
         }
     }
 
@@ -97,13 +121,90 @@ enum MouseAppExceptionSupport {
                            point: CGPoint,
                            now: TimeInterval) -> Bool {
         guard now >= resolvedAt, now - resolvedAt < resolveLifetime else { return false }
-        guard let region else { return point == resolvedPoint }
+        guard region != nil else { return point == resolvedPoint }
+        return cacheNamesWindow(region: region, point: point)
+    }
+
+    /// Whether an answer that aged out still names the window under the
+    /// pointer. The pointer thread serves that one instead of waiting for the
+    /// main thread; over any other window it has nothing to say yet.
+    static func cacheNamesWindow(region: CGRect?, point: CGPoint) -> Bool {
+        guard let region else { return false }
         return region.contains(point)
     }
 
     static func isExcepted(_ bundleID: String?, exceptions: Set<String>) -> Bool {
         guard let bundleID, !exceptions.isEmpty else { return false }
         return exceptions.contains(bundleID)
+    }
+
+    /// A program that is not packaged as an app has no bundle identifier at
+    /// all — the Java process a game launcher starts is the one people ask
+    /// about (issue #1009) — so the path of the file being run stands in as
+    /// its identity. A stored path is told apart from a bundle identifier by
+    /// its leading slash, which a bundle identifier never has, so one list
+    /// carries both kinds and everything already saved keeps its meaning.
+    static func isExecutablePathIdentity(_ identity: String) -> Bool {
+        identity.hasPrefix("/")
+    }
+
+    /// The one spelling a path identity is stored and matched by. The file
+    /// sheet hands back the name the user browsed while a running program
+    /// reports the name it was started under, and the same file reaches the
+    /// two ends under different names whenever anything on the way is a link:
+    /// measured on this Mac, the sheet answers /private/tmp/… where the
+    /// running program answers /tmp/… for one file. Both ends resolve, so
+    /// they meet. A relative path is nothing to resolve against and is no
+    /// identity at all.
+    static func executablePathIdentity(_ path: String?) -> String? {
+        guard let path, isExecutablePathIdentity(path) else { return nil }
+        return URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+    }
+
+    /// What an app answers to: its bundle identifier when it has one, and the
+    /// file being run when it does not. Ordinary apps are unaffected — they
+    /// keep answering to the identifier they always did, and the path is not
+    /// even looked at for them: this runs under the event taps.
+    static func identity(bundleID: String?, executablePath: @autoclosure () -> String?) -> String? {
+        bundleID ?? executablePathIdentity(executablePath())
+    }
+
+    /// What a picked file will be reported as once it runs, which is what the
+    /// picker has to store. A file sheet can be walked into a bundle, and the
+    /// binary at Contents/MacOS is reported by its bundle identifier rather
+    /// than by its path, so storing the file there would match nothing.
+    ///
+    /// Only the bundle's OWN executable counts, which is the same rule the
+    /// system applies: measured on this Mac, a bundle's main executable run
+    /// straight from disk is reported as com.example.withid, while a runtime
+    /// shipped deeper in that same bundle — the Java a game launcher starts
+    /// (issue #1009) — is reported with no identifier at all and stays a path.
+    /// Walking up to any enclosing .app when storing would file that Java
+    /// under the launcher and break the case this all exists for — a rule
+    /// about the picked identity only: the source scope walks up on purpose
+    /// (sourceBundleIdentifiers), so a helper inherits the exception of the
+    /// app it shipped inside.
+    static func pickedIdentity(for url: URL) -> String? {
+        // Pointed at the bundle: its identifier, or the binary it runs when
+        // the Info.plist names none, which is what the system reports for it.
+        if let bundle = Bundle(url: url) {
+            return bundle.bundleIdentifier ?? executablePathIdentity(bundle.executableURL?.path)
+        }
+        // Walked inside one: only the bundle's own executable is reported by
+        // the identifier, so anything deeper keeps its own path.
+        let picked = executablePathIdentity(url.path)
+        var candidate = url.deletingLastPathComponent()
+        while candidate.path != "/" {
+            if candidate.pathExtension.caseInsensitiveCompare("app") == .orderedSame,
+               let bundle = Bundle(url: candidate),
+               executablePathIdentity(bundle.executableURL?.path) == picked {
+                return bundle.bundleIdentifier ?? picked
+            }
+            let parent = candidate.deletingLastPathComponent()
+            guard parent != candidate else { break }
+            candidate = parent
+        }
+        return picked
     }
 
     static func sourceProcessID(_ rawValue: Int64) -> Int32? {

@@ -10,10 +10,21 @@ import SwiftUI
 struct CommandBarView: View {
     /// Short enough to sit on one line, chosen to show three different things
     /// the bar can do that a list of commands would never reveal.
-    static var examples: [String] {
-        ["100 km to mi", "2+2*3", "battery", "fire"].filter {
-            $0 != "battery" || PowerSampler.hasInternalBattery
+    ///
+    /// The battery one is the localized word, because that is the word the
+    /// answer is titled with. As a fixed English "battery" the chip matched
+    /// nothing in the other twelve languages and led to an empty list, which
+    /// teaches the opposite of what an example is for. The other three hold
+    /// everywhere: the maths is language-free, the conversion parser already
+    /// takes each language's own word for "to", and the emoji names come from
+    /// Unicode, which spells them in English on purpose.
+    static func examples(_ text: CommandBarFeatureStrings) -> [String] {
+        var examples = ["100 km to mi", "2+2*3"]
+        if PowerSampler.hasInternalBattery {
+            examples.append(text.answerBatteryLabel.lowercased())
         }
+        examples.append("fire")
+        return examples
     }
     /// As tall as the list is ever allowed to be, so the panel never grows
     /// past what a laptop screen can show above the fold.
@@ -103,6 +114,14 @@ struct CommandBarView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchBar
+            if let warning = service.uninstallWarning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 17)
+                    .padding(.bottom, 12)
+            }
             switch service.mode {
             case .search:
                 if showsCategoryChips {
@@ -335,9 +354,10 @@ struct CommandBarView: View {
                 .padding(.horizontal, 17)
                 .padding(.top, 12)
             }
-            Text(text.shortcutCaptureHint)
+            Text(service.aliasWarning ?? text.shortcutCaptureHint)
                 .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(service.aliasWarning == nil
+                                 ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.orange))
                 .padding(.horizontal, 17)
                 .padding(.bottom, 12)
         }
@@ -401,7 +421,7 @@ struct CommandBarView: View {
                         .font(.system(size: 9, weight: .bold))
                         .tracking(0.5)
                         .foregroundStyle(.tertiary)
-                    ForEach(CommandBarView.examples, id: \.self) { example in
+                    ForEach(CommandBarView.examples(text), id: \.self) { example in
                         Button {
                             service.query = example
                         } label: {
@@ -798,7 +818,12 @@ struct CommandBarView: View {
     private var uninstallReviewCard: some View {
         switch uninstaller.phase {
         case .empty:
-            EmptyView()
+            VStack(spacing: 12) {
+                Text(l10n.s.uninstallerSelectionUnavailable)
+                    .foregroundStyle(.secondary)
+                Button(l10n.s.uninstallerCancel) { service.stepBack() }
+            }
+            .padding(20)
         case .scanning:
             uninstallReviewBusy(l10n.s.uninstallerScanning)
         case .results:
@@ -939,9 +964,16 @@ struct CommandBarView: View {
 
     private func uninstallReviewRow(_ item: AppUninstaller.Leftover) -> some View {
         HStack(spacing: 7) {
-            Toggle("", isOn: uninstallIncludeBinding(item))
+            Toggle(item.name, isOn: uninstallIncludeBinding(item))
                 .labelsHidden()
                 .toggleStyle(.checkbox)
+                .focusable(interactions: .edit)
+                .onKeyPress(.space) {
+                    let included = uninstaller.items.first(where: { $0.id == item.id })?.include ?? false
+                    uninstaller.setInclude(!included, for: item.id)
+                    return .handled
+                }
+                .disabled(uninstaller.isRemoving)
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                 .resizable()
                 .frame(width: 16, height: 16)
@@ -950,14 +982,28 @@ struct CommandBarView: View {
                     .font(.system(size: 11))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(item.url.deletingLastPathComponent().path
-                        .replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.head)
+                HStack(spacing: 5) {
+                    if item.confidence == .related {
+                        Label(l10n.s.cleanerOptionalSection, systemImage: "questionmark.circle")
+                            .foregroundStyle(.orange)
+                    }
+                    Text(item.url.deletingLastPathComponent().path
+                            .replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+                .font(.system(size: 9.5))
             }
             Spacer(minLength: 0)
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([item.url])
+            } label: {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.plain)
+            .help(l10n.s.cleanerRevealInFinder)
+            .accessibilityLabel(l10n.s.cleanerRevealInFinder)
             Text(Self.uninstallByteString(item.size))
                 .font(.system(size: 10))
                 .monospacedDigit()
@@ -999,20 +1045,17 @@ struct CommandBarView: View {
 
     private func uninstallReviewDone(freed: Int64, failed: [AppUninstaller.Leftover]) -> some View {
         VStack(spacing: 9) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: UninstallerSupport.doneSymbol(hasLeftovers: !failed.isEmpty))
                 .font(.system(size: 28))
-                .foregroundStyle(.green)
+                .foregroundStyle(failed.isEmpty ? .green : .orange)
             Text(l10n.s.uninstallerDoneTitle)
                 .font(.system(size: 13, weight: .bold))
             Text(String(format: l10n.s.uninstallerFreedFormat, Self.uninstallByteString(freed)))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             if !failed.isEmpty {
-                Text(l10n.s.uninstallerSomeFailed)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.orange)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                UninstallFailureNote(items: failed, compact: true)
+                    .padding(.horizontal, 17)
             }
             Button(l10n.s.uninstallerAnother) { service.runSelected() }
                 .buttonStyle(.borderedProminent)

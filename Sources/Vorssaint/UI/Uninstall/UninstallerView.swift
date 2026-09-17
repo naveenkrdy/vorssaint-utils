@@ -11,7 +11,7 @@ struct UninstallerView: View {
     @ObservedObject private var uninstaller = AppUninstaller.shared
     @ObservedObject private var homebrew = HomebrewManager.shared
     @ObservedObject private var permissions = Permissions.shared
-    @AppStorage(DefaultsKey.uninstallerCommandBarEnabled) private var commandBarEnabled = true
+    @AppStorage(DefaultsKey.uninstallerCommandBarEnabled) private var commandBarEnabled = false
     @State private var dropTargeted = false
     @State private var showingAppPicker = false
     @State private var pendingHomebrewRemoval: HomebrewPackage?
@@ -189,11 +189,27 @@ struct UninstallerView: View {
                 .resizable().frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name).font(.system(size: 12.5)).lineLimit(1).truncationMode(.middle)
-                Text(prettyPath(item.url))
-                    .font(.system(size: 10.5)).foregroundStyle(.tertiary)
-                    .lineLimit(1).truncationMode(.head)
+                HStack(spacing: 5) {
+                    if item.confidence == .related {
+                        Label(l10n.s.cleanerOptionalSection, systemImage: "questionmark.circle")
+                            .foregroundStyle(.orange)
+                    }
+                    Text(prettyPath(item.url))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+                .font(.system(size: 10.5))
             }
             Spacer()
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([item.url])
+            } label: {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.plain)
+            .help(l10n.s.cleanerRevealInFinder)
+            .accessibilityLabel(l10n.s.cleanerRevealInFinder)
             Text(Self.byteString(item.size))
                 .font(.system(size: 11.5)).foregroundStyle(.secondary)
                 .monospacedDigit()
